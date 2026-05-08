@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
+
 type Pago = {
   pago_id: string;
   orden_id: string;
@@ -33,6 +35,23 @@ function formatearMonto(monto: number) {
 }
 
 export default async function MovimientosPage() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#f6f1e7] px-6">
+        <section className="rounded-3xl bg-white p-8 shadow-xl text-center">
+          <h1 className="text-2xl font-bold text-[#37413d]">
+            Debes iniciar sesión
+          </h1>
+          <p className="mt-3 text-[#5f7269]">
+            Para ver los movimientos tenés que estar logueado.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const pagos = await obtenerPagos();
 
   return (

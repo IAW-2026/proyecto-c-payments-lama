@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
+
 type Pago = {
   pago_id: string;
   orden_id: string;
@@ -9,13 +11,6 @@ type Pago = {
   estado: string;
   proveedor: string;
 };
-
-type Props = {
-  params: Promise<{
-    comprador_id: string;
-  }>;
-};
-
 
 async function obtenerCompras(compradorId: string): Promise<Pago[]> {
   const res = await fetch(
@@ -38,9 +33,23 @@ function formatearMonto(monto: number) {
   return `$${Math.round(monto).toLocaleString("es-AR")}`;
 }
 
-export default async function PagosPage({ params }: Props) {
-  const { comprador_id } = await params;
-  const compras = await obtenerCompras(comprador_id);
+export default async function PagosPage() {
+  // 👇 Usuario logueado con Clerk
+  const { userId } = await auth();
+
+  // 👇 Si no está logueado
+  if (!userId) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <h1 className="text-2xl font-bold">
+          Debes iniciar sesión
+        </h1>
+      </main>
+    );
+  }
+
+  // 👇 Usa el userId de Clerk como comprador_id
+  const compras = await obtenerCompras(userId);
 
   return (
     <main className="min-h-screen bg-[#f6f1e7] px-6 py-8">
@@ -54,7 +63,9 @@ export default async function PagosPage({ params }: Props) {
               Payments App
             </p>
 
-            <h1 className="mt-2 text-4xl font-bold">Mis compras</h1>
+            <h1 className="mt-2 text-4xl font-bold">
+              Mis compras
+            </h1>
 
             <p className="mt-3 max-w-2xl text-[#eef0ea]">
               Vista del comprador para consultar pagos y estados de compra.
@@ -64,27 +75,40 @@ export default async function PagosPage({ params }: Props) {
 
         <div className="grid gap-4 px-8 py-6 md:grid-cols-3">
           <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#6f7f6d]">Compras registradas</p>
+            <p className="text-sm text-[#6f7f6d]">
+              Compras registradas
+            </p>
+
             <p className="mt-2 text-2xl font-bold text-[#37413d]">
               {compras.length}
             </p>
           </div>
 
           <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#6f7f6d]">Total gastado</p>
+            <p className="text-sm text-[#6f7f6d]">
+              Total gastado
+            </p>
+
             <p className="mt-2 text-2xl font-bold text-[#37413d]">
               {formatearMonto(
-                compras.reduce((total, compra) => total + compra.monto_total, 0)
+                compras.reduce(
+                  (total, compra) => total + compra.monto_total,
+                  0
+                )
               )}
             </p>
           </div>
 
           <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#6f7f6d]">Pendientes</p>
+            <p className="text-sm text-[#6f7f6d]">
+              Pendientes
+            </p>
+
             <p className="mt-2 text-2xl font-bold text-[#6f7f6d]">
               {
-                compras.filter((compra) => compra.estado === "pendiente")
-                  .length
+                compras.filter(
+                  (compra) => compra.estado === "pendiente"
+                ).length
               }
             </p>
           </div>
@@ -103,7 +127,10 @@ export default async function PagosPage({ params }: Props) {
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="text-sm text-[#6f7f6d]">Orden</p>
+                    <p className="text-sm text-[#6f7f6d]">
+                      Orden
+                    </p>
+
                     <h3 className="text-xl font-bold text-[#37413d]">
                       {compra.orden_id}
                     </h3>
@@ -116,46 +143,32 @@ export default async function PagosPage({ params }: Props) {
 
                 <div className="mt-5 grid gap-4 md:grid-cols-3">
                   <div>
-                    <p className="text-sm text-[#6f7f6d]">Vendedor</p>
+                    <p className="text-sm text-[#6f7f6d]">
+                      Vendedor
+                    </p>
+
                     <p className="font-medium text-[#37413d]">
                       {compra.vendedor_id}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-sm text-[#6f7f6d]">Proveedor</p>
+                    <p className="text-sm text-[#6f7f6d]">
+                      Proveedor
+                    </p>
+
                     <p className="font-medium text-[#37413d]">
                       {compra.proveedor}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-sm text-[#6f7f6d]">Total pagado</p>
+                    <p className="text-sm text-[#6f7f6d]">
+                      Total pagado
+                    </p>
+
                     <p className="text-lg font-bold text-[#37413d]">
                       {formatearMonto(compra.monto_total)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#6f7f6d]">Producto</p>
-                    <p className="font-bold text-[#37413d]">
-                      {formatearMonto(compra.monto_producto)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#6f7f6d]">Envío</p>
-                    <p className="font-bold text-[#37413d]">
-                      {formatearMonto(compra.monto_envio)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#6f7f6d]">Estado</p>
-                    <p className="font-bold text-[#6f7f6d]">
-                      {compra.estado}
                     </p>
                   </div>
                 </div>

@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
+
 type Pago = {
   pago_id: string;
   orden_id: string;
@@ -11,12 +13,6 @@ type Pago = {
   moneda: string;
   estado: string;
   proveedor: string;
-};
-
-type Props = {
-  params: Promise<{
-    vendedor_id: string;
-  }>;
 };
 
 async function obtenerVentas(vendedorId: string): Promise<Pago[]> {
@@ -40,10 +36,25 @@ function formatearMonto(monto: number) {
   return `$${Math.round(monto).toLocaleString("es-AR")}`;
 }
 
-export default async function VentasPage({ params }: Props) {
-  const { vendedor_id } = await params;
+export default async function VentasPage() {
+  const { userId } = await auth();
 
-  const ventas = await obtenerVentas(vendedor_id);
+  if (!userId) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#f6f1e7] px-6">
+        <section className="rounded-3xl bg-white p-8 shadow-xl text-center">
+          <h1 className="text-2xl font-bold text-[#37413d]">
+            Debes iniciar sesión
+          </h1>
+          <p className="mt-3 text-[#6f7f6d]">
+            Para ver tus ventas tenés que estar logueado.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  const ventas = await obtenerVentas(userId);
 
   return (
     <main className="min-h-screen bg-[#f6f1e7] px-6 py-8">
@@ -64,7 +75,7 @@ export default async function VentasPage({ params }: Props) {
             </p>
 
             <p className="mt-2 text-sm text-[#eef0ea]">
-              Vendedor: {vendedor_id}
+              Vendedor: {userId}
             </p>
           </div>
         </div>
