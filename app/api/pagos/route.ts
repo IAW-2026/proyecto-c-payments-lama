@@ -1,6 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+
+  const rol = searchParams.get("rol");
+  const comprador_id = searchParams.get("comprador_id");
+  const vendedor_id = searchParams.get("vendedor_id");
+
+  if (!rol || !["comprador", "vendedor", "superadmin"].includes(rol)) {
+    return NextResponse.json(
+      { error: "Rol inválido. Usar comprador, vendedor o superadmin" },
+      { status: 400 }
+    );
+  }
+
+  let query = supabase
+    .from("pago")
+    .select("*")
+    .order("fecha_creacion", { ascending: false });
+
+  if (rol === "comprador") {
+    if (!comprador_id) {
+      return NextResponse.json(
+        { error: "Para rol comprador se requiere comprador_id" },
+        { status: 400 }
+      );
+    }
+
+    query = query.eq("comprador_id", comprador_id);
+  }
+
+  if (rol === "vendedor") {
+    if (!vendedor_id) {
+      return NextResponse.json(
+        { error: "Para rol vendedor se requiere vendedor_id" },
+        { status: 400 }
+      );
+    }
+
+    query = query.eq("vendedor_id", vendedor_id);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json(data, { status: 200 });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
