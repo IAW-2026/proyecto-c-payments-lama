@@ -35,9 +35,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const pagoMercadoPago = await paymentClient.get({
-      id: String(mercadoPagoPaymentId),
-    });
+    let pagoMercadoPago;
+
+try {
+  pagoMercadoPago = await paymentClient.get({
+    id: String(mercadoPagoPaymentId),
+  });
+} catch (error) {
+  console.error(
+    "No se pudo consultar el pago en Mercado Pago:",
+    mercadoPagoPaymentId,
+    error
+  );
+
+  return NextResponse.json(
+    {
+      message:
+        "Webhook recibido, pero el pago no existe en Mercado Pago. Esto puede pasar con la prueba de configuración.",
+      payment_id: mercadoPagoPaymentId,
+    },
+    { status: 200 }
+  );
+}
 
     console.log("Pago obtenido desde Mercado Pago:", {
       id: pagoMercadoPago.id,
