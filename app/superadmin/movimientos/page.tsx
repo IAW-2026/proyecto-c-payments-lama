@@ -16,8 +16,12 @@ type Pago = {
   fecha_creacion: string;
 };
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
 async function obtenerPagos(): Promise<Pago[]> {
-  const res = await fetch("http://localhost:3000/api/pagos?rol=superadmin", {
+  const res = await fetch(
+    `${baseUrl}/api/pagos?rol=superadmin`, {
     cache: "no-store",
   });
 
