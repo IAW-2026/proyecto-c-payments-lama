@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { preferenceClient } from "@/lib/mercadopago";
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "http://localhost:3000";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -12,9 +16,17 @@ export async function POST(req: NextRequest) {
       comprador_email,
     } = body;
 
-    if (!orden_id || !titulo || !monto_total || !comprador_email) {
+    if (
+      !orden_id ||
+      !titulo ||
+      !monto_total ||
+      !comprador_email
+    ) {
       return NextResponse.json(
-        { error: "Faltan datos obligatorios para crear la preferencia" },
+        {
+          error:
+            "Faltan datos obligatorios para crear la preferencia",
+        },
         { status: 400 }
       );
     }
@@ -30,15 +42,25 @@ export async function POST(req: NextRequest) {
             currency_id: "ARS",
           },
         ],
+
         payer: {
           email: comprador_email,
         },
+
         external_reference: orden_id,
+
         back_urls: {
-          success: `http://localhost:3000/pago/${orden_id}/exito`,
-          failure: `http://localhost:3000/pago/${orden_id}/fallo`,
-          pending: `http://localhost:3000/pago/${orden_id}/pendiente`,
+          success: `${baseUrl}/pago/${orden_id}/exito`,
+
+          failure: `${baseUrl}/pago/${orden_id}/fallo`,
+
+          pending: `${baseUrl}/pago/${orden_id}/pendiente`,
         },
+
+        auto_return: "approved",
+
+        notification_url:
+          `${baseUrl}/api/mercadopago/webhook`,
       },
     });
 
@@ -46,7 +68,8 @@ export async function POST(req: NextRequest) {
       {
         preference_id: preference.id,
         init_point: preference.init_point,
-        sandbox_init_point: preference.sandbox_init_point,
+        sandbox_init_point:
+          preference.sandbox_init_point,
       },
       { status: 201 }
     );
@@ -54,7 +77,10 @@ export async function POST(req: NextRequest) {
     console.error(error);
 
     return NextResponse.json(
-      { error: "Error al crear la preferencia de Mercado Pago" },
+      {
+        error:
+          "Error al crear la preferencia de Mercado Pago",
+      },
       { status: 500 }
     );
   }
