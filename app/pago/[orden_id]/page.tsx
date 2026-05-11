@@ -3,114 +3,82 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
 export default function PagoPage() {
   const params = useParams();
-
   const ordenId = params.orden_id as string;
 
   const [cargando, setCargando] = useState(false);
 
-  // 👇 ORDEN MOCKEADA
-  // después esto vendrá desde Buyer App
   const orden = {
     orden_id: ordenId,
     comprador_id: "comp_1",
     vendedor_id: "vend_1",
-
     producto: {
       titulo: "Campera Vintage Denim",
       precio: 25000,
     },
-
     envio: 3500,
   };
 
   const total = orden.producto.precio + orden.envio;
 
- async function pagar() {
-  try {
-    setCargando(true);
+  async function pagar() {
+    try {
+      setCargando(true);
 
-    // 👇 1. Crear pago interno en Supabase
-    const pagoRes = await fetch(
-      "http://localhost:3000/api/pagos",
-      {
+      const pagoRes = await fetch(`${baseUrl}/api/pagos`, {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
           orden_id: orden.orden_id,
           comprador_id: orden.comprador_id,
           vendedor_id: orden.vendedor_id,
           monto_producto: orden.producto.precio,
           monto_envio: orden.envio,
-
-          // 👇 UUID real de metodo_pago
-          metodo_pago_id:
-            "8b18b150-269f-44bb-870c-c9fabc0543fc",
+          metodo_pago_id: "8b18b150-269f-44bb-870c-c9fabc0543fc",
         }),
+      });
+
+      const pagoData = await pagoRes.json();
+
+      if (!pagoRes.ok) {
+        alert(pagoData.error || "Error al crear el pago");
+        return;
       }
-    );
 
-    const pagoData = await pagoRes.json();
-
-    if (!pagoRes.ok) {
-      alert(
-        pagoData.error || "Error al crear el pago"
-      );
-
-      return;
-    }
-
-    // 👇 2. Crear preferencia Mercado Pago
-    const mpRes = await fetch(
-      "http://localhost:3000/api/mercadopago/preferencia",
-      {
+      const mpRes = await fetch(`${baseUrl}/api/mercadopago/preferencia`, {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
           orden_id: orden.orden_id,
-
           titulo: orden.producto.titulo,
-
           monto_total: total,
-
-          comprador_email:
-            "test_user_7906625558558336324@testuser.com",
+          comprador_email: "test_user_7906625558558336324@testuser.com",
         }),
+      });
+
+      const mpData = await mpRes.json();
+
+      if (!mpRes.ok) {
+        alert(mpData.error || "Error al crear preferencia MP");
+        return;
       }
-    );
 
-    const mpData = await mpRes.json();
-
-    if (!mpRes.ok) {
-      alert(
-        mpData.error ||
-          "Error al crear preferencia MP"
-      );
-
-      return;
+      window.location.href = mpData.sandbox_init_point;
+    } catch (error) {
+      console.error(error);
+      alert("Error inesperado");
+    } finally {
+      setCargando(false);
     }
-
-    // 👇 3. Redirigir al checkout de Mercado Pago
-    window.location.href =
-      mpData.sandbox_init_point;
-
-  } catch (error) {
-    console.error(error);
-
-    alert("Error inesperado");
-  } finally {
-    setCargando(false);
   }
-}
 
   return (
     <main className="min-h-screen bg-[#f6f1e7] px-6 py-8">
@@ -123,9 +91,7 @@ export default function PagoPage() {
               Payments App
             </p>
 
-            <h1 className="mt-2 text-4xl font-bold">
-              Confirmar pago
-            </h1>
+            <h1 className="mt-2 text-4xl font-bold">Confirmar pago</h1>
 
             <p className="mt-3 text-[#eef0ea]">
               Revisá el resumen antes de continuar con el pago.
@@ -135,9 +101,7 @@ export default function PagoPage() {
 
         <div className="px-8 py-8">
           <div className="rounded-3xl bg-[#ede6d8] p-6">
-            <p className="text-sm text-[#6f7f6d]">
-              Orden
-            </p>
+            <p className="text-sm text-[#6f7f6d]">Orden</p>
 
             <h2 className="mt-1 text-2xl font-bold text-[#37413d]">
               {orden.orden_id}
@@ -145,9 +109,7 @@ export default function PagoPage() {
 
             <div className="mt-6 grid gap-4">
               <div className="rounded-2xl bg-white p-5">
-                <p className="text-sm text-[#6f7f6d]">
-                  Producto
-                </p>
+                <p className="text-sm text-[#6f7f6d]">Producto</p>
 
                 <p className="mt-1 text-xl font-bold text-[#37413d]">
                   {orden.producto.titulo}
@@ -156,9 +118,7 @@ export default function PagoPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl bg-white p-5">
-                  <p className="text-sm text-[#6f7f6d]">
-                    Precio producto
-                  </p>
+                  <p className="text-sm text-[#6f7f6d]">Precio producto</p>
 
                   <p className="mt-1 text-2xl font-bold text-[#37413d]">
                     ${orden.producto.precio.toLocaleString("es-AR")}
@@ -166,9 +126,7 @@ export default function PagoPage() {
                 </div>
 
                 <div className="rounded-2xl bg-white p-5">
-                  <p className="text-sm text-[#6f7f6d]">
-                    Envío
-                  </p>
+                  <p className="text-sm text-[#6f7f6d]">Envío</p>
 
                   <p className="mt-1 text-2xl font-bold text-[#37413d]">
                     ${orden.envio.toLocaleString("es-AR")}
@@ -177,9 +135,7 @@ export default function PagoPage() {
               </div>
 
               <div className="rounded-2xl bg-[#b3b68d]/40 p-5">
-                <p className="text-sm text-[#6f7f6d]">
-                  Total a pagar
-                </p>
+                <p className="text-sm text-[#6f7f6d]">Total a pagar</p>
 
                 <p className="mt-1 text-3xl font-bold text-[#37413d]">
                   ${total.toLocaleString("es-AR")}
@@ -193,9 +149,7 @@ export default function PagoPage() {
             disabled={cargando}
             className="mt-8 w-full rounded-3xl bg-[#8fa18d] px-5 py-5 text-lg font-semibold text-white transition hover:bg-[#7d907b] disabled:opacity-60"
           >
-            {cargando
-              ? "Procesando pago..."
-              : "Pagar con Mercado Pago"}
+            {cargando ? "Procesando pago..." : "Pagar con Mercado Pago"}
           </button>
         </div>
       </section>
