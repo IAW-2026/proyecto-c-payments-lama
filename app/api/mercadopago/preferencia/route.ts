@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    console.log("Creando preferencia de Mercado Pago para orden:");
 
     const preference = await preferenceClient.create({
       body: {
