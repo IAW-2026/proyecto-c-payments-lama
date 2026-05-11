@@ -15,9 +15,12 @@ type Pago = {
   proveedor: string;
 };
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
 async function obtenerVentas(vendedorId: string): Promise<Pago[]> {
   const res = await fetch(
-    `http://localhost:3000/api/pagos?rol=vendedor&vendedor_id=${vendedorId}`,
+    `${baseUrl}/api/pagos?rol=vendedor&vendedor_id=${vendedorId}`,
     {
       cache: "no-store",
     }
