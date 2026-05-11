@@ -29,20 +29,20 @@ export default function PagoPage() {
     try {
       setCargando(true);
 
-      const pagoRes = await fetch(`${baseUrl}/api/pagos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orden_id: orden.orden_id,
-          comprador_id: orden.comprador_id,
-          vendedor_id: orden.vendedor_id,
-          monto_producto: orden.producto.precio,
-          monto_envio: orden.envio,
-          metodo_pago_id: "8b18b150-269f-44bb-870c-c9fabc0543fc",
-        }),
-      });
+     const pagoRes = await fetch("/api/pagos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        orden_id: orden.orden_id,
+        comprador_id: orden.comprador_id,
+        vendedor_id: orden.vendedor_id,
+        monto_producto: orden.producto.precio,
+        monto_envio: orden.envio,
+        metodo_pago_id: "8b18b150-269f-44bb-870c-c9fabc0543fc",
+      }),
+    });
 
       const pagoData = await pagoRes.json();
 
@@ -51,7 +51,7 @@ export default function PagoPage() {
         return;
       }
 
-      const mpRes = await fetch(`${baseUrl}/api/mercadopago/preferencia`, {
+      const mpRes = await fetch("/api/mercadopago/preferencia", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
