@@ -27,11 +27,17 @@ export async function POST(req: NextRequest) {
       body?.resource?.split("/").pop();
 
     if (!mercadoPagoPaymentId) {
-      console.log("Webhook sin payment id:", body);
+      console.log(
+        "Webhook de prueba recibido sin payment id:",
+        body
+      );
 
       return NextResponse.json(
-        { error: "No se recibió el ID del pago de Mercado Pago" },
-        { status: 400 }
+        {
+          message:
+            "Webhook recibido correctamente. No se procesó pago porque no vino payment_id.",
+        },
+        { status: 200 }
       );
     }
 
