@@ -60,7 +60,7 @@ export default function PagoPage() {
           orden_id: orden.orden_id,
           titulo: orden.producto.titulo,
           monto_total: total,
-          comprador_email: "test_user_7906625558558336324@testuser.com",
+          comprador_email: "test_user_503484223242855649@testuser.com",
         }),
       });
 
