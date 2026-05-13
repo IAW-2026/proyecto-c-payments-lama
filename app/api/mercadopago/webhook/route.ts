@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { paymentClient } from "@/lib/mercadopago";
+import { paymentClient, merchantOrderClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
 
 function mapearEstadoMercadoPago(status: string) {
@@ -21,16 +21,36 @@ export async function POST(req: NextRequest) {
 
     console.log("Webhook Mercado Pago recibido:", body);
 
-    const mercadoPagoPaymentId =
-      body?.data?.id ||
-      body?.id ||
-      body?.resource?.split("/").pop();
+    const tipoNotificacion = body?.type || body?.topic;
+
+    let mercadoPagoPaymentId: string | undefined;
+
+    if (tipoNotificacion === "payment") {
+      mercadoPagoPaymentId = body?.data?.id?.toString() || body?.id?.toString();
+    }
+
+    if (tipoNotificacion === "merchant_order") {
+      const merchantOrderId = body?.resource?.split("/").pop();
+
+      console.log("Consultando merchant order:", merchantOrderId);
+
+      if (merchantOrderId) {
+        const merchantOrder = await merchantOrderClient.get({
+          merchantOrderId,
+        });
+
+        console.log("Merchant order obtenida:", merchantOrder);
+
+        const primerPago = merchantOrder.payments?.[0];
+
+        if (primerPago?.id) {
+          mercadoPagoPaymentId = primerPago.id.toString();
+        }
+      }
+    }
 
     if (!mercadoPagoPaymentId) {
-      console.log(
-        "Webhook de prueba recibido sin payment id:",
-        body
-      );
+      console.log("Webhook recibido sin payment_id procesable:", body);
 
       return NextResponse.json(
         {
@@ -43,26 +63,26 @@ export async function POST(req: NextRequest) {
 
     let pagoMercadoPago;
 
-try {
-  pagoMercadoPago = await paymentClient.get({
-    id: String(mercadoPagoPaymentId),
-  });
-} catch (error) {
-  console.error(
-    "No se pudo consultar el pago en Mercado Pago:",
-    mercadoPagoPaymentId,
-    error
-  );
+    try {
+      pagoMercadoPago = await paymentClient.get({
+        id: String(mercadoPagoPaymentId),
+      });
+    } catch (error) {
+      console.error(
+        "No se pudo consultar el pago en Mercado Pago:",
+        mercadoPagoPaymentId,
+        error
+      );
 
-  return NextResponse.json(
-    {
-      message:
-        "Webhook recibido, pero el pago no existe en Mercado Pago. Esto puede pasar con la prueba de configuración.",
-      payment_id: mercadoPagoPaymentId,
-    },
-    { status: 200 }
-  );
-}
+      return NextResponse.json(
+        {
+          message:
+            "Webhook recibido, pero el pago no existe en Mercado Pago. Esto puede pasar con la prueba de configuración.",
+          payment_id: mercadoPagoPaymentId,
+        },
+        { status: 200 }
+      );
+    }
 
     console.log("Pago obtenido desde Mercado Pago:", {
       id: pagoMercadoPago.id,
@@ -108,14 +128,23 @@ try {
       })
       .eq("orden_id", ordenId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (errorPago) {
       console.log("Error actualizando pago:", errorPago);
 
+      return NextResponse.json({ error: errorPago.message }, { status: 500 });
+    }
+
+    if (!pagoActualizado) {
+      console.log("No existe pago interno para la orden:", ordenId);
+
       return NextResponse.json(
-        { error: errorPago.message },
-        { status: 500 }
+        {
+          error: "No existe pago interno para esa orden",
+          orden_id: ordenId,
+        },
+        { status: 404 }
       );
     }
 
