@@ -2,36 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { preferenceClient } from "@/lib/mercadopago";
 
 const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  "http://localhost:3000";
+  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const {
-      orden_id,
-      titulo,
-      monto_total,
-      comprador_email,
-    } = body;
+    const { orden_id, titulo, monto_total, comprador_email } = body;
 
-    if (
-      !orden_id ||
-      !titulo ||
-      !monto_total ||
-      !comprador_email
-    ) {
+    if (!orden_id || !titulo || !monto_total || !comprador_email) {
       return NextResponse.json(
         {
-          error:
-            "Faltan datos obligatorios para crear la preferencia",
+          error: "Faltan datos obligatorios para crear la preferencia",
         },
         { status: 400 }
       );
     }
-    
-    console.log("Creando preferencia de Mercado Pago para orden:");
+
+    console.log("Base URL usada:", baseUrl);
+    console.log(
+      "Notification URL enviada a Mercado Pago:",
+      `${baseUrl}/api/mercadopago/webhook`
+    );
+    console.log("Orden enviada a Mercado Pago:", orden_id);
 
     const preference = await preferenceClient.create({
       body: {
@@ -51,37 +44,40 @@ export async function POST(req: NextRequest) {
 
         external_reference: orden_id,
 
+        metadata: {
+          orden_id,
+        },
+
         back_urls: {
           success: `${baseUrl}/pago/${orden_id}/exito`,
-
           failure: `${baseUrl}/pago/${orden_id}/fallo`,
-
           pending: `${baseUrl}/pago/${orden_id}/pendiente`,
         },
 
-        auto_return: "approved",
-
-        notification_url:
-          `${baseUrl}/api/mercadopago/webhook`,
+        notification_url: `${baseUrl}/api/mercadopago/webhook`,
       },
+    });
+
+    console.log("Preferencia creada en Mercado Pago:", {
+      id: preference.id,
+      init_point: preference.init_point,
+      sandbox_init_point: preference.sandbox_init_point,
     });
 
     return NextResponse.json(
       {
         preference_id: preference.id,
         init_point: preference.init_point,
-        sandbox_init_point:
-          preference.sandbox_init_point,
+        sandbox_init_point: preference.sandbox_init_point,
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error(error);
+    console.error("Error creando preferencia:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Error al crear la preferencia de Mercado Pago",
+        error: "Error al crear la preferencia de Mercado Pago",
       },
       { status: 500 }
     );
