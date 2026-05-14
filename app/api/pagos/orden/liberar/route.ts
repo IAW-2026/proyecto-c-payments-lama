@@ -35,44 +35,72 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: errorTransaccion } = await supabase
+    const { data: transaccionesExistentes } = await supabase
       .from("transaccion_de_pago")
-      .insert([
-        {
-          pago_id: pago.pago_id,
-          tipo_transaccion: "liberacion",
-          monto: pago.monto_neto,
-          estado: "aprobado",
-          transaccion_proveedor_id: envio_id,
-          codigo_proveedor: "ENVIO_ENTREGADO",
-          mensaje_proveedor:
-            "Pago liberado al vendedor luego de confirmarse la entrega",
-        },
-      ]);
+      .select("*")
+      .eq("pago_id", pago.pago_id)
+      .in("tipo_transaccion", ["liberacion_vendedor", "pago_envio"]);
 
-    if (errorTransaccion) {
+    if (transaccionesExistentes && transaccionesExistentes.length > 0) {
       return NextResponse.json(
-        { error: errorTransaccion.message },
+        {
+          error: "Este pago ya fue liberado anteriormente",
+          transacciones: transaccionesExistentes,
+        },
+        { status: 409 }
+      );
+    }
+
+    const transacciones = [
+      {
+        pago_id: pago.pago_id,
+        tipo_transaccion: "liberacion_vendedor",
+        monto: pago.monto_neto,
+        estado: "aprobado",
+        transaccion_proveedor_id: `VENDEDOR-${pago.vendedor_id}`,
+        codigo_proveedor: "ENVIO_ENTREGADO",
+        mensaje_proveedor: `Pago liberado al vendedor ${pago.vendedor_id} luego de confirmarse la entrega ${envio_id}`,
+      },
+      {
+        pago_id: pago.pago_id,
+        tipo_transaccion: "pago_envio",
+        monto: pago.monto_envio,
+        estado: "aprobado",
+        transaccion_proveedor_id: `ENVIO-${envio_id}`,
+        codigo_proveedor: "ENVIO_ENTREGADO",
+        mensaje_proveedor: `Pago del envío liberado luego de confirmarse la entrega ${envio_id}`,
+      },
+    ];
+
+    const { data, error: errorTransacciones } = await supabase
+      .from("transaccion_de_pago")
+      .insert(transacciones)
+      .select();
+
+    if (errorTransacciones) {
+      return NextResponse.json(
+        { error: errorTransacciones.message },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
       {
-        message: "Pago liberado correctamente al vendedor",
+        message: "Fondos liberados correctamente",
         orden_id: pago.orden_id,
         envio_id,
-        pago_id: pago.pago_id,
         vendedor_id: pago.vendedor_id,
-        monto_liberado: pago.monto_neto,
+        monto_liberado_vendedor: pago.monto_neto,
+        monto_liberado_envio: pago.monto_envio,
+        transacciones: data,
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error al liberar pago:", error);
+    console.error("Error al liberar fondos:", error);
 
     return NextResponse.json(
-      { error: "Error interno al liberar el pago" },
+      { error: "Error interno al liberar fondos" },
       { status: 500 }
     );
   }
