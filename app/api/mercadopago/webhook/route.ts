@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { paymentClient, merchantOrderClient } from "@/lib/mercadopago";
+import { paymentClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
 
 function mapearEstadoMercadoPago(status: string) {
@@ -21,37 +21,16 @@ export async function POST(req: NextRequest) {
 
     console.log("Webhook Mercado Pago recibido:", body);
 
-    const tipoNotificacion = body?.type || body?.topic;
-
-    let mercadoPagoPaymentId: string | undefined;
-
-    if (tipoNotificacion === "payment") {
-      mercadoPagoPaymentId =
-        body?.data?.id?.toString() || body?.id?.toString();
-    }
-
-    if (tipoNotificacion === "merchant_order") {
-      const merchantOrderId = body?.resource?.split("/").pop();
-
-      console.log("Consultando merchant order:", merchantOrderId);
-
-      if (merchantOrderId) {
-        const merchantOrder = await merchantOrderClient.get({
-          merchantOrderId,
-        });
-
-        console.log("Merchant order obtenida:", merchantOrder);
-
-        const primerPago = merchantOrder.payments?.[0];
-
-        if (primerPago?.id) {
-          mercadoPagoPaymentId = primerPago.id.toString();
-        }
-      }
-    }
+    const mercadoPagoPaymentId =
+      body?.data?.id ||
+      body?.id ||
+      body?.resource?.split("/").pop();
 
     if (!mercadoPagoPaymentId) {
-      console.log("Webhook recibido sin payment_id procesable:", body);
+      console.log(
+        "Webhook de prueba recibido sin payment id:",
+        body
+      );
 
       return NextResponse.json(
         {
@@ -64,26 +43,26 @@ export async function POST(req: NextRequest) {
 
     let pagoMercadoPago;
 
-    try {
-      pagoMercadoPago = await paymentClient.get({
-        id: String(mercadoPagoPaymentId),
-      });
-    } catch (error) {
-      console.error(
-        "No se pudo consultar el pago en Mercado Pago:",
-        mercadoPagoPaymentId,
-        error
-      );
+try {
+  pagoMercadoPago = await paymentClient.get({
+    id: String(mercadoPagoPaymentId),
+  });
+} catch (error) {
+  console.error(
+    "No se pudo consultar el pago en Mercado Pago:",
+    mercadoPagoPaymentId,
+    error
+  );
 
-      return NextResponse.json(
-        {
-          message:
-            "Webhook recibido, pero el pago no existe en Mercado Pago.",
-          payment_id: mercadoPagoPaymentId,
-        },
-        { status: 200 }
-      );
-    }
+  return NextResponse.json(
+    {
+      message:
+        "Webhook recibido, pero el pago no existe en Mercado Pago. Esto puede pasar con la prueba de configuración.",
+      payment_id: mercadoPagoPaymentId,
+    },
+    { status: 200 }
+  );
+}
 
     console.log("Pago obtenido desde Mercado Pago:", {
       id: pagoMercadoPago.id,
@@ -129,7 +108,7 @@ export async function POST(req: NextRequest) {
       })
       .eq("orden_id", ordenId)
       .select()
-      .maybeSingle();
+      .single();
 
     if (errorPago) {
       console.log("Error actualizando pago:", errorPago);
@@ -140,55 +119,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!pagoActualizado) {
-      console.log("No existe pago interno para la orden:", ordenId);
-
-      return NextResponse.json(
-        {
-          error: "No existe pago interno para esa orden",
-          orden_id: ordenId,
-        },
-        { status: 404 }
-      );
-    }
-
     console.log("Pago actualizado:", pagoActualizado);
-
-    const { data: transaccionExistente, error: errorBuscarTransaccion } =
-      await supabase
-        .from("transaccion_de_pago")
-        .select("transaccion_id")
-        .eq("transaccion_proveedor_id", String(mercadoPagoPaymentId))
-        .eq("tipo_transaccion", tipoTransaccion)
-        .maybeSingle();
-
-    if (errorBuscarTransaccion) {
-      console.log(
-        "Error buscando transacción existente:",
-        errorBuscarTransaccion
-      );
-
-      return NextResponse.json(
-        { error: errorBuscarTransaccion.message },
-        { status: 500 }
-      );
-    }
-
-    if (transaccionExistente) {
-      console.log(
-        "Transacción ya registrada, no se duplica:",
-        transaccionExistente
-      );
-
-      return NextResponse.json(
-        {
-          message: "Webhook recibido, transacción ya registrada",
-          orden_id: ordenId,
-          estado: estadoPago,
-        },
-        { status: 200 }
-      );
-    }
 
     const { error: errorTransaccion } = await supabase
       .from("transaccion_de_pago")

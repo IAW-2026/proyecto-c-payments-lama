@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import { UserButton } from "@clerk/nextjs";
 
 type Pago = {
   pago_id: string;
@@ -20,8 +22,7 @@ const baseUrl =
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 async function obtenerPagos(): Promise<Pago[]> {
-  const res = await fetch(
-    `${baseUrl}/api/pagos?rol=superadmin`, {
+  const res = await fetch(`${baseUrl}/api/pagos?rol=superadmin`, {
     cache: "no-store",
   });
 
@@ -48,6 +49,7 @@ export default async function MovimientosPage() {
           <h1 className="text-2xl font-bold text-[#37413d]">
             Debes iniciar sesión
           </h1>
+
           <p className="mt-3 text-[#5f7269]">
             Para ver los movimientos tenés que estar logueado.
           </p>
@@ -63,9 +65,23 @@ export default async function MovimientosPage() {
       <section className="mx-auto max-w-6xl overflow-hidden rounded-[32px] bg-white shadow-xl">
         <div className="relative bg-[#8fa18d] px-8 py-10 text-white">
           <div className="absolute right-[-80px] top-[-80px] h-56 w-56 rounded-full bg-[#b3b68d]/40" />
+
           <div className="absolute right-24 bottom-4 h-24 w-24 rounded-full bg-[#9aadb0]/35" />
 
           <div className="relative z-10">
+            <div className="mb-10 flex items-center justify-between">
+          <div className="mb-10 flex items-center justify-between">
+            <Link
+            href="/seleccionar-rol"
+          >
+            <span className="text-4xl font-black leading-none text-[#d8ccb8]">
+              ⬅
+            </span>
+          </Link>
+          </div>
+            <UserButton />
+            </div>
+
             <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
               Payments App
             </p>
@@ -74,7 +90,7 @@ export default async function MovimientosPage() {
 
             <p className="mt-3 max-w-2xl text-[#eef0ea]">
               Vista administrativa para consultar todos los pagos registrados en
-              la plataforma ReWear.
+              la plataforma LAMA.
             </p>
           </div>
         </div>
@@ -82,6 +98,7 @@ export default async function MovimientosPage() {
         <div className="grid gap-4 px-8 py-6 md:grid-cols-4">
           <div className="rounded-3xl bg-[#ede6d8] p-5">
             <p className="text-sm text-[#5f7269]">Total movimientos</p>
+
             <p className="mt-2 text-2xl font-bold text-[#37413d]">
               {pagos.length}
             </p>
@@ -89,6 +106,7 @@ export default async function MovimientosPage() {
 
           <div className="rounded-3xl bg-[#ede6d8] p-5">
             <p className="text-sm text-[#5f7269]">Pendientes</p>
+
             <p className="mt-2 text-2xl font-bold text-[#37413d]">
               {pagos.filter((p) => p.estado === "pendiente").length}
             </p>
@@ -96,6 +114,7 @@ export default async function MovimientosPage() {
 
           <div className="rounded-3xl bg-[#ede6d8] p-5">
             <p className="text-sm text-[#5f7269]">Aprobados</p>
+
             <p className="mt-2 text-2xl font-bold text-[#37413d]">
               {pagos.filter((p) => p.estado === "aprobado").length}
             </p>
@@ -103,9 +122,13 @@ export default async function MovimientosPage() {
 
           <div className="rounded-3xl bg-[#ede6d8] p-5">
             <p className="text-sm text-[#5f7269]">Monto total</p>
+
             <p className="mt-2 text-2xl font-bold text-[#37413d]">
               {formatearMonto(
-                pagos.reduce((total, pago) => total + pago.monto_total, 0)
+                pagos.reduce(
+                  (total, pago) => total + pago.monto_total,
+                  0
+                )
               )}
             </p>
           </div>
@@ -125,6 +148,7 @@ export default async function MovimientosPage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm text-[#5f7269]">Orden</p>
+
                     <h3 className="text-xl font-bold text-[#37413d]">
                       {pago.orden_id}
                     </h3>
@@ -138,6 +162,7 @@ export default async function MovimientosPage() {
                 <div className="mt-5 grid gap-4 md:grid-cols-4">
                   <div>
                     <p className="text-sm text-[#5f7269]">Comprador</p>
+
                     <p className="font-medium text-[#37413d]">
                       {pago.comprador_id}
                     </p>
@@ -145,6 +170,7 @@ export default async function MovimientosPage() {
 
                   <div>
                     <p className="text-sm text-[#5f7269]">Vendedor</p>
+
                     <p className="font-medium text-[#37413d]">
                       {pago.vendedor_id}
                     </p>
@@ -152,6 +178,7 @@ export default async function MovimientosPage() {
 
                   <div>
                     <p className="text-sm text-[#5f7269]">Proveedor</p>
+
                     <p className="font-medium text-[#37413d]">
                       {pago.proveedor}
                     </p>
@@ -159,6 +186,7 @@ export default async function MovimientosPage() {
 
                   <div>
                     <p className="text-sm text-[#5f7269]">Total pagado</p>
+
                     <p className="text-lg font-bold text-[#37413d]">
                       {formatearMonto(pago.monto_total)}
                     </p>
@@ -168,6 +196,7 @@ export default async function MovimientosPage() {
                 <div className="mt-5 grid gap-3 md:grid-cols-4">
                   <div className="rounded-2xl bg-[#ede6d8] p-4">
                     <p className="text-xs text-[#5f7269]">Producto</p>
+
                     <p className="font-bold text-[#37413d]">
                       {formatearMonto(pago.monto_producto)}
                     </p>
@@ -175,6 +204,7 @@ export default async function MovimientosPage() {
 
                   <div className="rounded-2xl bg-[#ede6d8] p-4">
                     <p className="text-xs text-[#5f7269]">Envío</p>
+
                     <p className="font-bold text-[#37413d]">
                       {formatearMonto(pago.monto_envio)}
                     </p>
@@ -182,13 +212,17 @@ export default async function MovimientosPage() {
 
                   <div className="rounded-2xl bg-[#ede6d8] p-4">
                     <p className="text-xs text-[#5f7269]">Comisión</p>
+
                     <p className="font-bold text-[#37413d]">
                       {formatearMonto(pago.comision)}
                     </p>
                   </div>
 
                   <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#5f7269]">Neto vendedor</p>
+                    <p className="text-xs text-[#5f7269]">
+                      Neto vendedor
+                    </p>
+
                     <p className="font-bold text-[#515922]">
                       {formatearMonto(pago.monto_neto)}
                     </p>

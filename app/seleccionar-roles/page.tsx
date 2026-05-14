@@ -65,7 +65,7 @@ async function guardarRoles() {
           <div className="relative z-10 flex h-full flex-col justify-between">
             <div>
               <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
-                ReWear Payments
+                LAMA Payments
               </p>
 
               <h1 className="mt-3 text-4xl font-bold">
@@ -95,7 +95,7 @@ async function guardarRoles() {
               </p>
 
               <h2 className="mt-2 text-3xl font-bold text-[#37413d]">
-                ¿Qué querés hacer en ReWear?
+                ¿Qué querés hacer en LAMA?
               </h2>
             </div>
 

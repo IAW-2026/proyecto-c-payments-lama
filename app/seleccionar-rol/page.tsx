@@ -38,7 +38,7 @@ export default function SeleccionarRolPage() {
           <div className="relative z-10 flex h-full flex-col justify-between">
             <div>
               <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
-                ReWear Payments
+                LAMA Payments
               </p>
 
               <h1 className="mt-3 text-4xl font-bold">
@@ -125,11 +125,18 @@ export default function SeleccionarRolPage() {
               </button>
             )}
 
-            {roles.length === 0 && (
+                        {roles.length === 0 && (
               <div className="rounded-3xl bg-[#ede6d8] p-5 text-[#37413d]">
                 Tu usuario todavía no tiene roles asignados.
               </div>
             )}
+
+            <button
+              onClick={() => router.push("/")}
+              className="mt-4 rounded-3xl border border-[#8fa18d] px-5 py-4 font-semibold text-[#37413d] transition hover:bg-[#ede6d8]"
+            >
+              Volver al inicio
+            </button>
           </div>
         </div>
       </section>

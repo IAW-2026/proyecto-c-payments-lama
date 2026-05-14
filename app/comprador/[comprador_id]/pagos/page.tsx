@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 
 type Pago = {
@@ -62,6 +64,16 @@ export default async function PagosPage() {
           <div className="absolute right-24 bottom-4 h-24 w-24 rounded-full bg-[#9aadb0]/35" />
 
           <div className="relative z-10">
+            <div className="mb-8 flex items-center justify-between">
+              <Link href="/seleccionar-rol">
+                <span className="text-4xl font-black leading-none text-[#d8ccb8] transition hover:opacity-80">
+                  ⬅
+                </span>
+              </Link>
+
+              <UserButton />
+            </div>
+            
             <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
               Payments App
             </p>

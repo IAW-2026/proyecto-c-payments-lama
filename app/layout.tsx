@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ReWear",
+  title: "LAMA Payments",
   description: "Marketplace de ropa usada",
 };
 
