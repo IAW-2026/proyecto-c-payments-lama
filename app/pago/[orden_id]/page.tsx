@@ -18,9 +18,9 @@ export default function PagoPage() {
     vendedor_id: "vend_1",
     producto: {
       titulo: "Campera Vintage Denim",
-      precio: 1,
+      precio: 1000,
     },
-    envio: 3,
+    envio: 3000,
   };
 
   const total = orden.producto.precio + orden.envio;
