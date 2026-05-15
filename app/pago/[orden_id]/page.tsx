@@ -71,7 +71,8 @@ export default function PagoPage() {
         return;
       }
 
-      window.location.href = mpData.sandbox_init_point;
+      window.location.href = mpData.init_point;
+
     } catch (error) {
       console.error(error);
       alert("Error inesperado");
