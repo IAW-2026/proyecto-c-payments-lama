@@ -47,7 +47,10 @@ function extraerIdRecurso(body: WebhookMercadoPago) {
 function obtenerTipoNotificacion(body: WebhookMercadoPago) {
   const tipo = body.type || body.topic || body.action || "";
 
-  if (tipo.includes("merchant_order") || body.resource?.includes("merchant_orders")) {
+  if (
+    tipo.includes("merchant_order") ||
+    body.resource?.includes("merchant_orders")
+  ) {
     return "merchant_order";
   }
 
@@ -56,6 +59,39 @@ function obtenerTipoNotificacion(body: WebhookMercadoPago) {
   }
 
   return tipo;
+}
+
+function esperar(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function obtenerMerchantOrderConPagos(merchantOrderId: string) {
+  const intentos = 3;
+
+  for (let intento = 1; intento <= intentos; intento++) {
+    const merchantOrder = await merchantOrderClient.get({
+      merchantOrderId,
+    });
+
+    console.log("Merchant order obtenida desde Mercado Pago:", {
+      intento,
+      id: merchantOrder.id,
+      status: merchantOrder.status,
+      order_status: merchantOrder.order_status,
+      external_reference: merchantOrder.external_reference,
+      payments: merchantOrder.payments,
+    });
+
+    if (merchantOrder.payments?.length) {
+      return merchantOrder;
+    }
+
+    if (intento < intentos) {
+      await esperar(1500);
+    }
+  }
+
+  return null;
 }
 
 async function obtenerPaymentIdDesdeWebhook(body: WebhookMercadoPago) {
@@ -76,24 +112,14 @@ async function obtenerPaymentIdDesdeWebhook(body: WebhookMercadoPago) {
     return String(recursoId);
   }
 
-  const merchantOrder = await merchantOrderClient.get({
-    merchantOrderId: String(recursoId),
-  });
-
-  console.log("Merchant order obtenida desde Mercado Pago:", {
-    id: merchantOrder.id,
-    status: merchantOrder.status,
-    order_status: merchantOrder.order_status,
-    external_reference: merchantOrder.external_reference,
-    payments: merchantOrder.payments,
-  });
+  const merchantOrder = await obtenerMerchantOrderConPagos(String(recursoId));
 
   const pagoPreferido =
-    merchantOrder.payments?.find((payment) =>
+    merchantOrder?.payments?.find((payment) =>
       ["approved", "pending", "in_process", "authorized"].includes(
         payment.status || ""
       )
-    ) || merchantOrder.payments?.find((payment) => payment.id);
+    ) || merchantOrder?.payments?.find((payment) => payment.id);
 
   return pagoPreferido?.id ? String(pagoPreferido.id) : null;
 }
