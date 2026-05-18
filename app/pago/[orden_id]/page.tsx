@@ -2,47 +2,98 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-
-const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+import { useClerk, useUser } from "@clerk/nextjs";
 
 export default function PagoPage() {
   const params = useParams();
   const ordenId = params.orden_id as string;
 
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+
   const [cargando, setCargando] = useState(false);
 
   const orden = {
     orden_id: ordenId,
-    comprador_id: "comp_1",
+
+    // Mock: tiene que coincidir con el comprador dueño de la orden
+    comprador_id: "user_3DRaFo6JeyL5La245RLPa5SjHP5",
+
     vendedor_id: "vend_1",
+
     producto: {
       titulo: "Campera Vintage Denim",
-      precio: 100,
+      precio: 1,
     },
-    envio: 300,
+
+    envio: 3,
   };
 
   const total = orden.producto.precio + orden.envio;
+
+  if (!isLoaded) {
+    return (
+      <main className="min-h-screen bg-[#f6f1e7] flex items-center justify-center">
+        <p className="text-[#37413d]">Cargando...</p>
+      </main>
+    );
+  }
+
+  if (!user) {
+    window.location.href = `/sign-in?redirect_url=${encodeURIComponent(
+      `/pago/${ordenId}`
+    )}`;
+
+    return null;
+  }
+
+  if (user.id !== orden.comprador_id) {
+    return (
+      <main className="min-h-screen bg-[#f6f1e7] flex items-center justify-center px-6">
+        <section className="rounded-3xl bg-white p-8 shadow-xl text-center max-w-md">
+          <h1 className="text-2xl font-bold text-[#37413d]">
+            No tenés permiso para pagar esta orden
+          </h1>
+
+          <p className="mt-3 text-[#6f7f6d]">
+            Esta orden pertenece a otro comprador.
+          </p>
+
+          <button
+            onClick={async () => {
+              await signOut({
+                redirectUrl: `/sign-in?redirect_url=${encodeURIComponent(
+                  `/pago/${ordenId}`
+                )}`,
+              });
+            }}
+            className="mt-6 w-full rounded-3xl bg-[#8fa18d] px-5 py-4 font-semibold text-white transition hover:bg-[#7d907b]"
+          >
+            Cerrar sesión e ingresar con otro usuario
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   async function pagar() {
     try {
       setCargando(true);
 
-     const pagoRes = await fetch("/api/pagos", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        orden_id: orden.orden_id,
-        comprador_id: orden.comprador_id,
-        vendedor_id: orden.vendedor_id,
-        monto_producto: orden.producto.precio,
-        monto_envio: orden.envio,
-        metodo_pago_id: "8b18b150-269f-44bb-870c-c9fabc0543fc",
-      }),
-    });
+      const pagoRes = await fetch("/api/pagos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orden_id: orden.orden_id,
+          comprador_id: orden.comprador_id,
+          vendedor_id: orden.vendedor_id,
+          monto_producto: orden.producto.precio,
+          monto_envio: orden.envio,
+          metodo_pago_id: "8b18b150-269f-44bb-870c-c9fabc0543fc",
+        }),
+      });
 
       const pagoData = await pagoRes.json();
 
@@ -71,8 +122,7 @@ export default function PagoPage() {
         return;
       }
 
-      window.location.href = mpData.init_point;
-
+      window.location.href = mpData.sandbox_init_point;
     } catch (error) {
       console.error(error);
       alert("Error inesperado");
