@@ -1,6 +1,15 @@
-import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
 import { UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import {
+  AppPage,
+  BackLink,
+  DetailTile,
+  EmptyState,
+  HeroPanel,
+  MetricCard,
+  Pagination,
+  StatusPill,
+} from "../../components/design";
 
 type Pago = {
   pago_id: string;
@@ -18,11 +27,17 @@ type Pago = {
   fecha_creacion: string;
 };
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+type PageProps = {
+  searchParams?: Promise<{
+    page?: string | string[];
+  }>;
+};
+
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const PAGE_SIZE = 5;
 
 async function obtenerPagos(): Promise<Pago[]> {
-  const res = await fetch(`${baseUrl}/api/pagos?rol=superadmin`, {
+  const res = await fetch(`${baseUrl}/api/pagos?rol=super_admin`, {
     cache: "no-store",
   });
 
@@ -39,17 +54,24 @@ function formatearMonto(monto: number) {
   return `$${Math.round(monto).toLocaleString("es-AR")}`;
 }
 
-export default async function MovimientosPage() {
+function obtenerPagina(page: string | string[] | undefined) {
+  const value = Array.isArray(page) ? page[0] : page;
+  const parsed = Number(value || "1");
+
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+}
+
+export default async function MovimientosPage({ searchParams }: PageProps) {
   const { userId } = await auth();
+  const params = await searchParams;
 
   if (!userId) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#f6f1e7] px-6">
-        <section className="rounded-3xl bg-white p-8 shadow-xl text-center">
-          <h1 className="text-2xl font-bold text-[#37413d]">
+      <main className="flex min-h-screen items-center justify-center bg-[#f6f1e7] px-6">
+        <section className="rounded-2xl border border-[#d9ddcf] bg-[#fffdf8] p-8 text-center shadow-[0_24px_70px_rgba(55,65,61,0.12)]">
+          <h1 className="text-2xl font-semibold text-[#37413d]">
             Debes iniciar sesión
           </h1>
-
           <p className="mt-3 text-[#5f7269]">
             Para ver los movimientos tenés que estar logueado.
           </p>
@@ -59,110 +81,73 @@ export default async function MovimientosPage() {
   }
 
   const pagos = await obtenerPagos();
+  const totalPages = Math.max(1, Math.ceil(pagos.length / PAGE_SIZE));
+  const currentPage = Math.min(obtenerPagina(params?.page), totalPages);
+  const pagosPaginados = pagos.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   return (
-    <main className="min-h-screen bg-[#f6f1e7] px-6 py-8">
-      <section className="mx-auto max-w-6xl overflow-hidden rounded-[32px] bg-white shadow-xl">
-        <div className="relative bg-[#8fa18d] px-8 py-10 text-white">
-          <div className="absolute right-[-80px] top-[-80px] h-56 w-56 rounded-full bg-[#b3b68d]/40" />
-
-          <div className="absolute right-24 bottom-4 h-24 w-24 rounded-full bg-[#9aadb0]/35" />
-
-          <div className="relative z-10">
-            <div className="mb-10 flex items-center justify-between">
-          <div className="mb-10 flex items-center justify-between">
-            <Link
-            href="/seleccionar-rol"
-          >
-            <span className="text-4xl font-black leading-none text-[#d8ccb8]">
-              ⬅
-            </span>
-          </Link>
-          </div>
-            <UserButton />
-            </div>
-
-            <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
-              Payments App
-            </p>
-
-            <h1 className="mt-2 text-4xl font-bold">Movimientos</h1>
-
-            <p className="mt-3 max-w-2xl text-[#eef0ea]">
-              Vista administrativa para consultar todos los pagos registrados en
-              la plataforma LAMA.
-            </p>
-          </div>
+    <AppPage>
+      <HeroPanel
+        eyebrow="Payments App"
+        title="Movimientos"
+        description="Vista administrativa para consultar todos los pagos registrados en la plataforma LAMA."
+      >
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <BackLink />
+          <UserButton />
         </div>
+      </HeroPanel>
 
-        <div className="grid gap-4 px-8 py-6 md:grid-cols-4">
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#5f7269]">Total movimientos</p>
+      <div className="grid gap-4 border-b border-[#d9ddcf] bg-white/50 px-6 py-6 md:grid-cols-4 sm:px-8">
+        <MetricCard label="Total movimientos" value={pagos.length} />
+        <MetricCard
+          label="Pendientes"
+          value={pagos.filter((pago) => pago.estado === "pendiente").length}
+        />
+        <MetricCard
+          label="Aprobados"
+          value={pagos.filter((pago) => pago.estado === "aprobado").length}
+        />
+        <MetricCard
+          label="Monto total"
+          value={formatearMonto(
+            pagos.reduce((total, pago) => total + pago.monto_total, 0)
+          )}
+          accent
+        />
+      </div>
 
-            <p className="mt-2 text-2xl font-bold text-[#37413d]">
-              {pagos.length}
-            </p>
-          </div>
+      <div className="px-6 py-8 sm:px-8">
+        <h2 className="mb-4 text-xl font-semibold text-[#37413d]">
+          Pagos registrados
+        </h2>
 
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#5f7269]">Pendientes</p>
-
-            <p className="mt-2 text-2xl font-bold text-[#37413d]">
-              {pagos.filter((p) => p.estado === "pendiente").length}
-            </p>
-          </div>
-
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#5f7269]">Aprobados</p>
-
-            <p className="mt-2 text-2xl font-bold text-[#37413d]">
-              {pagos.filter((p) => p.estado === "aprobado").length}
-            </p>
-          </div>
-
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#5f7269]">Monto total</p>
-
-            <p className="mt-2 text-2xl font-bold text-[#37413d]">
-              {formatearMonto(
-                pagos.reduce(
-                  (total, pago) => total + pago.monto_total,
-                  0
-                )
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="px-8 pb-8">
-          <h2 className="mb-4 text-xl font-bold text-[#37413d]">
-            Pagos registrados
-          </h2>
-
+        {pagos.length === 0 ? (
+          <EmptyState>No hay pagos registrados todavía.</EmptyState>
+        ) : (
           <div className="grid gap-4">
-            {pagos.map((pago) => (
+            {pagosPaginados.map((pago) => (
               <article
                 key={pago.pago_id}
-                className="rounded-3xl border border-[#d9ddcf] bg-white p-5 shadow-sm"
+                className="rounded-xl border border-[#d9ddcf] bg-white p-5 shadow-[0_10px_30px_rgba(55,65,61,0.06)]"
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm text-[#5f7269]">Orden</p>
-
-                    <h3 className="text-xl font-bold text-[#37413d]">
+                    <h3 className="mt-1 text-xl font-semibold text-[#37413d]">
                       {pago.orden_id}
                     </h3>
                   </div>
 
-                  <span className="w-fit rounded-full bg-[#b3b68d]/40 px-4 py-2 text-sm font-medium text-[#515922]">
-                    {pago.estado}
-                  </span>
+                  <StatusPill>{pago.estado}</StatusPill>
                 </div>
 
                 <div className="mt-5 grid gap-4 md:grid-cols-4">
                   <div>
                     <p className="text-sm text-[#5f7269]">Comprador</p>
-
                     <p className="font-medium text-[#37413d]">
                       {pago.comprador_id}
                     </p>
@@ -170,7 +155,6 @@ export default async function MovimientosPage() {
 
                   <div>
                     <p className="text-sm text-[#5f7269]">Vendedor</p>
-
                     <p className="font-medium text-[#37413d]">
                       {pago.vendedor_id}
                     </p>
@@ -178,7 +162,6 @@ export default async function MovimientosPage() {
 
                   <div>
                     <p className="text-sm text-[#5f7269]">Proveedor</p>
-
                     <p className="font-medium text-[#37413d]">
                       {pago.proveedor}
                     </p>
@@ -186,53 +169,44 @@ export default async function MovimientosPage() {
 
                   <div>
                     <p className="text-sm text-[#5f7269]">Total pagado</p>
-
-                    <p className="text-lg font-bold text-[#37413d]">
+                    <p className="text-lg font-semibold text-[#37413d]">
                       {formatearMonto(pago.monto_total)}
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-4">
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#5f7269]">Producto</p>
-
-                    <p className="font-bold text-[#37413d]">
-                      {formatearMonto(pago.monto_producto)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#5f7269]">Envío</p>
-
-                    <p className="font-bold text-[#37413d]">
-                      {formatearMonto(pago.monto_envio)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#5f7269]">Comisión</p>
-
-                    <p className="font-bold text-[#37413d]">
-                      {formatearMonto(pago.comision)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-[#ede6d8] p-4">
-                    <p className="text-xs text-[#5f7269]">
-                      Neto vendedor
-                    </p>
-
-                    <p className="font-bold text-[#515922]">
-                      {formatearMonto(pago.monto_neto)}
-                    </p>
-                  </div>
+                  <DetailTile
+                    label="Producto"
+                    value={formatearMonto(pago.monto_producto)}
+                  />
+                  <DetailTile
+                    label="Envío"
+                    value={formatearMonto(pago.monto_envio)}
+                  />
+                  <DetailTile
+                    label="Comisión"
+                    value={formatearMonto(pago.comision)}
+                  />
+                  <DetailTile
+                    label="Neto vendedor"
+                    value={formatearMonto(pago.monto_neto)}
+                    accent
+                  />
                 </div>
               </article>
             ))}
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={pagos.length}
+              pageSize={PAGE_SIZE}
+              itemLabel="pagos"
+            />
           </div>
-        </div>
-      </section>
-    </main>
+        )}
+      </div>
+    </AppPage>
   );
 }

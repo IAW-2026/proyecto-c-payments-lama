@@ -8,9 +8,12 @@ export async function GET(req: NextRequest) {
   const comprador_id = searchParams.get("comprador_id");
   const vendedor_id = searchParams.get("vendedor_id");
 
-  if (!rol || !["comprador", "vendedor", "superadmin"].includes(rol)) {
+  if (
+    !rol ||
+    !["comprador", "vendedor", "superadmin", "super_admin"].includes(rol)
+  ) {
     return NextResponse.json(
-      { error: "Rol inválido. Usar comprador, vendedor o superadmin" },
+      { error: "Rol inválido. Usar comprador, vendedor o super_admin" },
       { status: 400 }
     );
   }

@@ -1,6 +1,15 @@
-import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import {
+  AppPage,
+  BackLink,
+  DetailTile,
+  EmptyState,
+  HeroPanel,
+  MetricCard,
+  Pagination,
+  StatusPill,
+} from "../../../components/design";
 
 type Pago = {
   pago_id: string;
@@ -17,8 +26,14 @@ type Pago = {
   proveedor: string;
 };
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+type PageProps = {
+  searchParams?: Promise<{
+    page?: string | string[];
+  }>;
+};
+
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const PAGE_SIZE = 5;
 
 async function obtenerVentas(vendedorId: string): Promise<Pago[]> {
   const res = await fetch(
@@ -41,17 +56,24 @@ function formatearMonto(monto: number) {
   return `$${Math.round(monto).toLocaleString("es-AR")}`;
 }
 
-export default async function VentasPage() {
+function obtenerPagina(page: string | string[] | undefined) {
+  const value = Array.isArray(page) ? page[0] : page;
+  const parsed = Number(value || "1");
+
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+}
+
+export default async function VentasPage({ searchParams }: PageProps) {
   const { userId } = await auth();
+  const params = await searchParams;
 
   if (!userId) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#f6f1e7] px-6">
-        <section className="rounded-3xl bg-white p-8 shadow-xl text-center">
-          <h1 className="text-2xl font-bold text-[#37413d]">
+      <main className="flex min-h-screen items-center justify-center bg-[#f6f1e7] px-6">
+        <section className="rounded-2xl border border-[#d9ddcf] bg-[#fffdf8] p-8 text-center shadow-[0_24px_70px_rgba(55,65,61,0.12)]">
+          <h1 className="text-2xl font-semibold text-[#37413d]">
             Debes iniciar sesión
           </h1>
-
           <p className="mt-3 text-[#6f7f6d]">
             Para ver tus ventas tenés que estar logueado.
           </p>
@@ -61,179 +83,119 @@ export default async function VentasPage() {
   }
 
   const ventas = await obtenerVentas(userId);
+  const totalPages = Math.max(1, Math.ceil(ventas.length / PAGE_SIZE));
+  const currentPage = Math.min(obtenerPagina(params?.page), totalPages);
+  const ventasPaginadas = ventas.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   return (
-    <main className="min-h-screen bg-[#f6f1e7] px-6 py-8">
-      <section className="mx-auto max-w-6xl overflow-hidden rounded-[32px] bg-white shadow-xl">
-        <div className="relative bg-[#8fa18d] px-8 py-10 text-white">
-          <div className="absolute right-[-80px] top-[-80px] h-56 w-56 rounded-full bg-[#b3b68d]/40" />
-
-          <div className="absolute right-24 bottom-4 h-24 w-24 rounded-full bg-[#9aadb0]/35" />
-
-          <div className="relative z-10">
-            <div className="mb-8 flex items-center justify-between">
-              <Link href="/seleccionar-rol">
-                <span className="text-4xl font-black leading-none text-[#d8ccb8] transition hover:opacity-80">
-                  ⬅
-                </span>
-              </Link>
-
-              <UserButton />
-            </div>
-            <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
-              Payments App
-            </p>
-            <h1 className="mt-2 text-4xl font-bold">Mis ventas</h1>
-            <p className="mt-3 max-w-2xl text-[#eef0ea]">
-              Vista del vendedor para consultar pagos asociados a sus ventas.
-            </p>
-
-          </div>
+    <AppPage>
+      <HeroPanel
+        eyebrow="Payments App"
+        title="Mis ventas"
+        description="Vista del vendedor para consultar pagos asociados a sus ventas."
+      >
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <BackLink />
+          <UserButton />
         </div>
+      </HeroPanel>
 
-        <div className="grid gap-4 px-8 py-6 md:grid-cols-3">
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#6f7f6d]">
-              Ventas registradas
-            </p>
-
-            <p className="mt-2 text-2xl font-bold text-[#37413d]">
-              {ventas.length}
-            </p>
-          </div>
-
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#6f7f6d]">
-              Total vendido
-            </p>
-
-            <p className="mt-2 text-2xl font-bold text-[#37413d]">
-              {formatearMonto(
-                ventas.reduce(
-                  (total, venta) => total + venta.monto_total,
-                  0
-                )
-              )}
-            </p>
-          </div>
-
-          <div className="rounded-3xl bg-[#ede6d8] p-5">
-            <p className="text-sm text-[#6f7f6d]">
-              Neto a recibir
-            </p>
-
-            <p className="mt-2 text-2xl font-bold text-[#6f7f6d]">
-              {formatearMonto(
-                ventas.reduce(
-                  (total, venta) => total + venta.monto_neto,
-                  0
-                )
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="px-8 pb-8">
-          <h2 className="mb-4 text-xl font-bold text-[#37413d]">
-            Ventas registradas
-          </h2>
-
-          {ventas.length === 0 ? (
-            <div className="rounded-3xl bg-[#ede6d8] p-6 text-[#6f7f6d]">
-              No hay ventas registradas para este vendedor.
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {ventas.map((venta) => (
-                <article
-                  key={venta.pago_id}
-                  className="rounded-3xl border border-[#d9ddcf] bg-white p-5 shadow-sm"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm text-[#6f7f6d]">
-                        Orden
-                      </p>
-
-                      <h3 className="text-xl font-bold text-[#37413d]">
-                        {venta.orden_id}
-                      </h3>
-                    </div>
-
-                    <span className="w-fit rounded-full bg-[#b3b68d]/40 px-4 py-2 text-sm font-medium text-[#6f7f6d]">
-                      {venta.estado}
-                    </span>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 md:grid-cols-3">
-                    <div>
-                      <p className="text-sm text-[#6f7f6d]">
-                        Comprador
-                      </p>
-
-                      <p className="font-medium text-[#37413d]">
-                        {venta.comprador_id}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-[#6f7f6d]">
-                        Proveedor
-                      </p>
-
-                      <p className="font-medium text-[#37413d]">
-                        {venta.proveedor}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm text-[#6f7f6d]">
-                        Total pagado
-                      </p>
-
-                      <p className="text-lg font-bold text-[#37413d]">
-                        {formatearMonto(venta.monto_total)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl bg-[#ede6d8] p-4">
-                      <p className="text-xs text-[#6f7f6d]">
-                        Producto
-                      </p>
-
-                      <p className="font-bold text-[#37413d]">
-                        {formatearMonto(venta.monto_producto)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-[#ede6d8] p-4">
-                      <p className="text-xs text-[#6f7f6d]">
-                        Comisión
-                      </p>
-
-                      <p className="font-bold text-[#37413d]">
-                        {formatearMonto(venta.comision)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-[#ede6d8] p-4">
-                      <p className="text-xs text-[#6f7f6d]">
-                        Neto vendedor
-                      </p>
-
-                      <p className="font-bold text-[#6f7f6d]">
-                        {formatearMonto(venta.monto_neto)}
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+      <div className="grid gap-4 border-b border-[#d9ddcf] bg-white/50 px-6 py-6 md:grid-cols-3 sm:px-8">
+        <MetricCard label="Ventas registradas" value={ventas.length} />
+        <MetricCard
+          label="Total vendido"
+          value={formatearMonto(
+            ventas.reduce((total, venta) => total + venta.monto_total, 0)
           )}
-        </div>
-      </section>
-    </main>
+        />
+        <MetricCard
+          label="Neto a recibir"
+          value={formatearMonto(
+            ventas.reduce((total, venta) => total + venta.monto_neto, 0)
+          )}
+          accent
+        />
+      </div>
+
+      <div className="px-6 py-8 sm:px-8">
+        <h2 className="mb-4 text-xl font-semibold text-[#37413d]">
+          Ventas registradas
+        </h2>
+
+        {ventas.length === 0 ? (
+          <EmptyState>No hay ventas registradas para este vendedor.</EmptyState>
+        ) : (
+          <div className="grid gap-4">
+            {ventasPaginadas.map((venta) => (
+              <article
+                key={venta.pago_id}
+                className="rounded-xl border border-[#d9ddcf] bg-white p-5 shadow-[0_10px_30px_rgba(55,65,61,0.06)]"
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm text-[#6f7f6d]">Orden</p>
+                    <h3 className="mt-1 text-xl font-semibold text-[#37413d]">
+                      {venta.orden_id}
+                    </h3>
+                  </div>
+
+                  <StatusPill>{venta.estado}</StatusPill>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <div>
+                    <p className="text-sm text-[#6f7f6d]">Comprador</p>
+                    <p className="font-medium text-[#37413d]">
+                      {venta.comprador_id}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-[#6f7f6d]">Proveedor</p>
+                    <p className="font-medium text-[#37413d]">
+                      {venta.proveedor}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-[#6f7f6d]">Total pagado</p>
+                    <p className="text-lg font-semibold text-[#37413d]">
+                      {formatearMonto(venta.monto_total)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <DetailTile
+                    label="Producto"
+                    value={formatearMonto(venta.monto_producto)}
+                  />
+                  <DetailTile
+                    label="Comisión"
+                    value={formatearMonto(venta.comision)}
+                  />
+                  <DetailTile
+                    label="Neto vendedor"
+                    value={formatearMonto(venta.monto_neto)}
+                    accent
+                  />
+                </div>
+              </article>
+            ))}
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={ventas.length}
+              pageSize={PAGE_SIZE}
+              itemLabel="ventas"
+            />
+          </div>
+        )}
+      </div>
+    </AppPage>
   );
 }

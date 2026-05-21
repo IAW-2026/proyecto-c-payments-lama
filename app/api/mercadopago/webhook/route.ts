@@ -135,20 +135,6 @@ async function notificarSellerApp({
   pagoId: string;
   motivo?: string;
 }) {
-  if (estadoPago === "rechazado") {
-    console.log("Mock Seller App - pago rechazado:", {
-      endpoint: `POST /api/ordenes-ventas/${ordenId}/pago-rechazado`,
-      request: {
-        orden_id: ordenId,
-        pago_id: pagoId,
-        motivo_rechazo: motivo || "Pago rechazado por el proveedor",
-        fecha_rechazo: new Date().toISOString(),
-      },
-    });
-
-    return;
-  }
-
   console.log("Mock Seller App - actualizar estado de pago:", {
     endpoint: `PATCH /api/ordenes-ventas/${ordenId}/estado-pago`,
     request: {

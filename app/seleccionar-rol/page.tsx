@@ -2,6 +2,45 @@
 
 import { useRouter } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
+import { EmptyState, SplitHero } from "../components/design";
+
+function toRoleList(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+
+  return typeof value === "string" ? [value] : [];
+}
+
+function RoleOption({
+  title,
+  description,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group rounded-xl border border-[#d9ddcf] bg-white p-5 text-left shadow-[0_10px_30px_rgba(55,65,61,0.06)] transition hover:-translate-y-0.5 hover:border-[#8fa18d] hover:shadow-[0_18px_40px_rgba(55,65,61,0.10)]"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f7f6d]">
+            Operar como
+          </p>
+          <p className="mt-2 text-2xl font-semibold text-[#37413d]">{title}</p>
+        </div>
+        <span className="rounded-full border border-[#d9ddcf] px-3 py-1 text-[#6f7f6d] transition group-hover:bg-[#ede6d8]">
+          →
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-[#6f7f6d]">{description}</p>
+    </button>
+  );
+}
 
 export default function SeleccionarRolPage() {
   const router = useRouter();
@@ -9,7 +48,7 @@ export default function SeleccionarRolPage() {
 
   if (!isLoaded) {
     return (
-      <main className="min-h-screen bg-[#f6f1e7] flex items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-[#f6f1e7]">
         <p className="text-[#37413d]">Cargando...</p>
       </main>
     );
@@ -21,125 +60,78 @@ export default function SeleccionarRolPage() {
   }
 
   const userId = user.id;
-
-  const roles = (user.publicMetadata.roles as string[]) || [];
+  const roles = [
+    ...toRoleList(user.publicMetadata.roles),
+    ...toRoleList(user.publicMetadata.role),
+    ...toRoleList(user.unsafeMetadata.roles),
+    ...toRoleList(user.unsafeMetadata.role),
+  ];
 
   const puedeComprar = roles.includes("comprador");
   const puedeVender = roles.includes("vendedor");
-  const esSuperadmin = roles.includes("superadmin");
+  const esSuperadmin =
+    roles.includes("super_admin") || roles.includes("superadmin");
 
   return (
-    <main className="min-h-screen bg-[#f6f1e7] px-6 py-8 flex items-center justify-center">
-      <section className="grid w-full max-w-6xl overflow-hidden rounded-[32px] bg-white shadow-xl md:grid-cols-2">
-        <div className="relative bg-[#8fa18d] px-8 py-12 text-white">
-          <div className="absolute right-[-80px] top-[-80px] h-56 w-56 rounded-full bg-[#b3b68d]/40" />
-          <div className="absolute left-[-40px] bottom-[-40px] h-40 w-40 rounded-full bg-[#9aadb0]/35" />
-
-          <div className="relative z-10 flex h-full flex-col justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-wide text-[#eef0ea]">
-                LAMA Payments
-              </p>
-
-              <h1 className="mt-3 text-4xl font-bold">
-                Elegí con qué rol querés operar
-              </h1>
-
-              <p className="mt-4 max-w-md text-[#eef0ea]">
-                Tu usuario puede tener uno o más roles habilitados. Seleccioná
-                cómo querés ingresar a Payments App.
-              </p>
-            </div>
-
-            <div className="mt-12 rounded-3xl bg-white/15 p-5">
-              <p className="text-sm text-[#eef0ea]">
-                Payments App administra compras, ventas, comisiones y
-                movimientos de la plataforma.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-8 py-12">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-wide text-[#6f7f6d]">
-                Selección de rol
-              </p>
-
-              <h2 className="mt-2 text-3xl font-bold text-[#37413d]">
-                ¿Cómo querés ingresar?
-              </h2>
-            </div>
-
-            <UserButton />
-          </div>
-
-          <p className="mb-8 text-[#6f7f6d]">
-            Solo se muestran los roles habilitados para tu usuario.
+    <SplitHero
+      eyebrow="LAMA Payments"
+      title="Elegí con qué rol querés operar"
+      description="Tu usuario puede tener uno o más roles habilitados. Seleccioná cómo querés entrar a Payments App."
+      note="Payments App administra compras, ventas, comisiones y movimientos de la plataforma."
+    >
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6f7f6d]">
+            Selección de rol
           </p>
-
-          <div className="grid gap-4">
-            {puedeComprar && (
-              <button
-                onClick={() => router.push(`/comprador/${userId}/pagos`)}
-                className="rounded-3xl border border-[#d9ddcf] bg-[#ede6d8] p-5 text-left transition hover:scale-[1.01] hover:shadow-md"
-              >
-                <p className="text-sm text-[#6f7f6d]">Operar como</p>
-                <p className="mt-1 text-2xl font-bold text-[#37413d]">
-                  Comprador
-                </p>
-                <p className="mt-2 text-sm text-[#6f7f6d]">
-                  Consultá compras realizadas, pagos y estados asociados.
-                </p>
-              </button>
-            )}
-
-            {puedeVender && (
-              <button
-                onClick={() => router.push(`/vendedor/${userId}/ventas`)}
-                className="rounded-3xl border border-[#d9ddcf] bg-[#ede6d8] p-5 text-left transition hover:scale-[1.01] hover:shadow-md"
-              >
-                <p className="text-sm text-[#6f7f6d]">Operar como</p>
-                <p className="mt-1 text-2xl font-bold text-[#37413d]">
-                  Vendedor
-                </p>
-                <p className="mt-2 text-sm text-[#6f7f6d]">
-                  Consultá ventas, comisiones y monto neto a recibir.
-                </p>
-              </button>
-            )}
-
-            {esSuperadmin && (
-              <button
-                onClick={() => router.push("/superadmin/movimientos")}
-                className="rounded-3xl border border-[#d9ddcf] bg-[#ede6d8] p-5 text-left transition hover:scale-[1.01] hover:shadow-md"
-              >
-                <p className="text-sm text-[#6f7f6d]">Operar como</p>
-                <p className="mt-1 text-2xl font-bold text-[#37413d]">
-                  Superadmin
-                </p>
-                <p className="mt-2 text-sm text-[#6f7f6d]">
-                  Visualizá todos los movimientos registrados en Payments App.
-                </p>
-              </button>
-            )}
-
-                        {roles.length === 0 && (
-              <div className="rounded-3xl bg-[#ede6d8] p-5 text-[#37413d]">
-                Tu usuario todavía no tiene roles asignados.
-              </div>
-            )}
-
-            <button
-              onClick={() => router.push("/")}
-              className="mt-4 rounded-3xl border border-[#8fa18d] px-5 py-4 font-semibold text-[#37413d] transition hover:bg-[#ede6d8]"
-            >
-              Volver al inicio
-            </button>
-          </div>
+          <h2 className="mt-3 text-3xl font-semibold text-[#37413d]">
+            ¿Cómo querés ingresar?
+          </h2>
         </div>
-      </section>
-    </main>
+
+        <UserButton />
+      </div>
+
+      <p className="mb-6 leading-7 text-[#6f7f6d]">
+        Solo se muestran los roles habilitados para tu usuario.
+      </p>
+
+      <div className="grid gap-4">
+        {puedeComprar && (
+          <RoleOption
+            title="Comprador"
+            description="Consultá compras realizadas, pagos y estados asociados."
+            onClick={() => router.push(`/comprador/${userId}/pagos`)}
+          />
+        )}
+
+        {puedeVender && (
+          <RoleOption
+            title="Vendedor"
+            description="Consultá ventas, comisiones y monto neto a recibir."
+            onClick={() => router.push(`/vendedor/${userId}/ventas`)}
+          />
+        )}
+
+        {esSuperadmin && (
+          <RoleOption
+            title="Superadmin"
+            description="Visualizá todos los movimientos registrados en Payments App."
+            onClick={() => router.push("/superadmin/movimientos")}
+          />
+        )}
+
+        {roles.length === 0 && (
+          <EmptyState>Tu usuario todavía no tiene roles asignados.</EmptyState>
+        )}
+
+        <button
+          onClick={() => router.push("/")}
+          className="mt-2 rounded-xl border border-[#8fa18d] px-5 py-3 font-semibold text-[#37413d] transition hover:bg-[#ede6d8]"
+        >
+          Volver al inicio
+        </button>
+      </div>
+    </SplitHero>
   );
 }
