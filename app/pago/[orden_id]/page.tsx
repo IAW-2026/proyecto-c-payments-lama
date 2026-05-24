@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useClerk, useUser } from "@clerk/nextjs";
-import { DetailTile, MetricCard, SplitHero } from "../../components/design";
+
+function formatMoney(value: number) {
+  return `$${value.toLocaleString("es-AR")}`;
+}
 
 function PaymentMessage({
   title,
@@ -16,19 +20,48 @@ function PaymentMessage({
   action?: ReactNode;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f6f1e7] px-6">
-      <section className="max-w-md rounded-2xl border border-[#d9ddcf] bg-[#fffdf8] p-8 text-center shadow-[0_24px_70px_rgba(55,65,61,0.12)]">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#b3b68d]/25 text-2xl font-semibold text-[#515922]">
+    <main className="lama-home relative grid min-h-screen place-items-center overflow-hidden bg-[#17211f] px-6 text-white">
+      <div className="lama-hero-image absolute inset-0 opacity-45" />
+      <div className="absolute inset-0 bg-[#17211f]/84" />
+      <div className="lama-grain absolute inset-0 opacity-[0.1]" />
+
+      <section className="relative max-w-md rounded-3xl border border-white/12 bg-white/[0.08] p-8 text-center shadow-[0_24px_70px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[#a8bba0]/35 bg-[#a8bba0]/18 text-2xl font-black text-[#d8e5d2]">
           !
         </div>
 
-        <h1 className="text-2xl font-semibold text-[#37413d]">{title}</h1>
-
-        <p className="mt-3 leading-7 text-[#6f7f6d]">{description}</p>
+        <p className="mt-6 text-xs font-black uppercase tracking-[0.32em] text-[#b7c8af]">
+          LAMA Payments
+        </p>
+        <h1 className="mt-3 text-3xl font-black">{title}</h1>
+        <p className="mt-4 leading-7 text-white/70">{description}</p>
 
         {action}
       </section>
     </main>
+  );
+}
+
+function DetailBox({
+  label,
+  value,
+  dark = false,
+}: {
+  label: string;
+  value: ReactNode;
+  dark?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl px-4 py-3 ${dark ? "bg-[#17211f] text-white" : "bg-[#f6f1e7] text-[#37413d]"}`}
+    >
+      <p
+        className={`text-xs font-bold uppercase tracking-[0.16em] ${dark ? "text-[#b7c8af]" : "text-[#6f7f6d]"}`}
+      >
+        {label}
+      </p>
+      <div className="mt-2 font-black">{value}</div>
+    </div>
   );
 }
 
@@ -67,8 +100,15 @@ export default function PagoPage() {
 
   if (!isLoaded) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f6f1e7]">
-        <p className="text-[#37413d]">Cargando...</p>
+      <main className="lama-home relative grid min-h-screen place-items-center overflow-hidden bg-[#17211f] text-white">
+        <div className="lama-hero-image absolute inset-0 opacity-45" />
+        <div className="absolute inset-0 bg-[#17211f]/82" />
+        <div className="relative rounded-3xl border border-white/12 bg-white/[0.08] px-8 py-6 text-center shadow-[0_24px_70px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+          <p className="text-xs font-black uppercase tracking-[0.34em] text-[#b7c8af]">
+            LAMA Payments
+          </p>
+          <p className="mt-3 text-xl font-black">Cargando pago...</p>
+        </div>
       </main>
     );
   }
@@ -84,12 +124,13 @@ export default function PagoPage() {
         description="Esta orden pertenece a otro comprador."
         action={
           <button
+            type="button"
             onClick={async () => {
               await signOut({
                 redirectUrl: signInUrl,
               });
             }}
-            className="mt-6 w-full rounded-xl bg-[#8fa18d] px-5 py-3 font-semibold text-white shadow-[0_12px_30px_rgba(143,161,141,0.35)] transition hover:bg-[#7d907b]"
+            className="mt-6 w-full rounded-full bg-[#a8bba0] px-6 py-4 font-black text-[#17211f] shadow-[0_22px_58px_rgba(168,187,160,0.26)] transition hover:-translate-y-0.5 hover:bg-[#c1d0ba]"
           >
             Cerrar sesión e ingresar con otro usuario
           </button>
@@ -105,8 +146,9 @@ export default function PagoPage() {
         description={mensajeError}
         action={
           <button
+            type="button"
             onClick={() => setMensajeError(null)}
-            className="mt-6 w-full rounded-xl bg-[#8fa18d] px-5 py-3 font-semibold text-white shadow-[0_12px_30px_rgba(143,161,141,0.35)] transition hover:bg-[#7d907b]"
+            className="mt-6 w-full rounded-full bg-[#a8bba0] px-6 py-4 font-black text-[#17211f] shadow-[0_22px_58px_rgba(168,187,160,0.26)] transition hover:-translate-y-0.5 hover:bg-[#c1d0ba]"
           >
             Volver a intentar
           </button>
@@ -178,69 +220,133 @@ export default function PagoPage() {
   }
 
   return (
-    <SplitHero
-      eyebrow="Lama Payments"
-      title="Confirmá tu pago"
-      description="Revisá el detalle de la orden antes de continuar. El cobro se procesa con Mercado Pago en un entorno seguro."
-      note="Tu pago queda registrado en Payments App para que comprador y vendedor puedan consultar el estado."
-    >
-      <div className="rounded-2xl border border-[#d9ddcf] bg-white p-5 shadow-[0_14px_35px_rgba(55,65,61,0.08)]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f7f6d]">
-              Resumen de orden
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#37413d]">
-              {orden.orden_id}
-            </h2>
-          </div>
-          <span className="rounded-full bg-[#b3b68d]/25 px-3 py-1 text-sm font-medium text-[#515922]">
-            pendiente
+    <main className="lama-home relative min-h-screen overflow-x-hidden bg-[#17211f] text-white">
+      <div className="lama-hero-image absolute inset-0 opacity-48" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(23,33,31,0.97)_0%,rgba(23,33,31,0.88)_48%,rgba(23,33,31,0.48)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(168,187,160,0.22),transparent_28%),radial-gradient(circle_at_76%_24%,rgba(0,158,227,0.12),transparent_24%),linear-gradient(180deg,rgba(10,14,13,0.02),rgba(10,14,13,0.74))]" />
+      <div className="lama-grain absolute inset-0 opacity-[0.1]" />
+      <div className="lama-scan absolute inset-x-0 top-0 h-28" />
+
+      <header className="relative z-20 flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
+        <Link href="/" className="group flex items-center gap-3">
+          <span className="text-3xl font-black tracking-[0.22em] text-white sm:text-4xl">
+            LAMA
           </span>
-        </div>
+          <span className="rounded-md border border-white/24 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60 transition group-hover:border-[#a8bba0] group-hover:text-[#c7d7bf]">
+            payments
+          </span>
+        </Link>
 
-        <div className="my-5 border-t border-dashed border-[#d9ddcf]" />
+        <span className="rounded-full border border-white/16 bg-white/5 px-5 py-3 text-sm font-black text-white/74 backdrop-blur">
+          Mercado Pago
+        </span>
+      </header>
 
-        <DetailTile label="Producto" value={orden.producto.titulo} />
+      <section className="relative z-10 grid min-h-[calc(100vh-88px)] gap-8 px-5 pb-10 sm:px-8 lg:px-12 2xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="flex flex-col justify-center">
+          <div className="lama-kicker flex items-center gap-4 text-xs font-black uppercase tracking-[0.48em] text-[#b7c8af] sm:text-sm">
+            <span className="h-px w-14 bg-[#b7c8af]/70" />
+            Checkout seguro
+          </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <MetricCard
-            label="Precio producto"
-            value={`$${orden.producto.precio.toLocaleString("es-AR")}`}
-          />
-          <MetricCard
-            label="Envío"
-            value={`$${orden.envio.toLocaleString("es-AR")}`}
-          />
-        </div>
+          <h1 className="mt-7 max-w-3xl text-[clamp(3.1rem,6.6vw,7rem)] font-black leading-[0.92] tracking-normal">
+            Confirmá
+            <span className="block text-[#a8bba0]">tu pago</span>
+          </h1>
 
-        <div className="mt-4 rounded-2xl border border-[#b3b68d]/50 bg-[#b3b68d]/20 p-5">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-sm text-[#6f7f6d]">Total a pagar</p>
-              <p className="mt-1 text-4xl font-semibold text-[#37413d]">
-                ${total.toLocaleString("es-AR")}
+          <p className="mt-7 max-w-2xl text-lg font-medium leading-8 text-white/72 sm:text-xl sm:leading-9">
+            Revisá la orden antes de continuar. El pago se registra en LAMA
+            Payments y se completa con Mercado Pago.
+          </p>
+
+          <div className="mt-9 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/12 bg-white/[0.08] px-5 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+              <p className="text-3xl font-black text-white">
+                {formatMoney(orden.producto.precio)}
+              </p>
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-white/48">
+                Producto
               </p>
             </div>
-            <div className="hidden rounded-xl bg-white/65 px-4 py-3 text-right sm:block">
-              <p className="text-xs text-[#6f7f6d]">Proveedor</p>
-              <p className="font-semibold text-[#37413d]">Mercado Pago</p>
+            <div className="rounded-2xl border border-white/12 bg-white/[0.08] px-5 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+              <p className="text-3xl font-black text-white">
+                {formatMoney(orden.envio)}
+              </p>
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-white/48">
+                Envío
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#a8bba0]/24 bg-[#a8bba0]/14 px-5 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+              <p className="text-3xl font-black text-[#d8e5d2]">
+                {formatMoney(total)}
+              </p>
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-[#b7c8af]">
+                Total
+              </p>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={pagar}
-          disabled={cargando}
-          className="mt-5 w-full rounded-xl bg-[#8fa18d] px-5 py-4 text-lg font-semibold text-white shadow-[0_12px_30px_rgba(143,161,141,0.35)] transition hover:bg-[#7d907b] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {cargando ? "Procesando pago..." : "Pagar con Mercado Pago"}
-        </button>
+        <div className="relative flex items-center">
+          <div className="lama-orbit absolute right-[5%] top-[8%] hidden h-[520px] w-[520px] rounded-full border border-white/10 lg:block" />
+          <div className="lama-orbit lama-orbit-two absolute right-[20%] top-[20%] hidden h-[350px] w-[350px] rounded-full border border-[#a8bba0]/18 lg:block" />
 
-        <p className="mt-4 text-center text-sm text-[#6f7f6d]">
-          Vas a salir momentáneamente de LAMA para completar el pago.
-        </p>
-      </div>
-    </SplitHero>
+          <div className="relative w-full rounded-[2rem] border border-white/12 bg-[#f6f1e7]/95 p-4 text-[#17211f] shadow-[0_34px_100px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:p-6">
+            <div className="flex flex-col gap-4 border-b border-[#d9ddcf] pb-5 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#6f7f6d]">
+                  Resumen de orden
+                </p>
+                <h2 className="mt-2 break-all text-3xl font-black text-[#17211f]">
+                  {orden.orden_id}
+                </h2>
+              </div>
+
+              <span className="w-fit rounded-full bg-[#d8ccb8]/55 px-4 py-2 text-sm font-black text-[#515922]">
+                pendiente
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <DetailBox label="Producto" value={orden.producto.titulo} />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailBox
+                  label="Precio producto"
+                  value={formatMoney(orden.producto.precio)}
+                />
+                <DetailBox label="Envío" value={formatMoney(orden.envio)} />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <DetailBox
+                  label="Total a pagar"
+                  value={
+                    <span className="text-4xl font-black">
+                      {formatMoney(total)}
+                    </span>
+                  }
+                  dark
+                />
+                <DetailBox label="Proveedor" value="Mercado Pago" />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={pagar}
+              disabled={cargando}
+              className="mt-5 w-full rounded-full bg-[#a8bba0] px-6 py-5 text-lg font-black text-[#17211f] shadow-[0_22px_58px_rgba(168,187,160,0.3)] transition hover:-translate-y-1 hover:bg-[#c1d0ba] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {cargando ? "Procesando pago..." : "Pagar con Mercado Pago"}
+            </button>
+
+            <p className="mt-4 text-center text-sm font-semibold text-[#6f7f6d]">
+              Vas a salir momentáneamente de LAMA para completar el pago.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

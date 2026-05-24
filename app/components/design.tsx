@@ -171,12 +171,14 @@ export function Pagination({
   totalItems,
   pageSize,
   itemLabel,
+  searchParams = {},
 }: {
   currentPage: number;
   totalPages: number;
   totalItems: number;
   pageSize: number;
   itemLabel: string;
+  searchParams?: Record<string, string | number | undefined>;
 }) {
   if (totalPages <= 1) {
     return null;
@@ -184,6 +186,19 @@ export function Pagination({
 
   const firstItem = (currentPage - 1) * pageSize + 1;
   const lastItem = Math.min(currentPage * pageSize, totalItems);
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value !== undefined && value !== "") {
+        params.set(key, String(value));
+      }
+    }
+
+    params.set("page", String(page));
+
+    return `?${params.toString()}`;
+  };
 
   return (
     <div className="mt-6 flex flex-col gap-3 border-t border-[#d9ddcf] pt-5 text-sm text-[#6f7f6d] sm:flex-row sm:items-center sm:justify-between">
@@ -193,7 +208,7 @@ export function Pagination({
 
       <div className="flex items-center gap-2">
         <Link
-          href={`?page=${currentPage - 1}`}
+          href={pageHref(currentPage - 1)}
           aria-disabled={currentPage === 1}
           className={`rounded-xl border px-4 py-2 font-medium transition ${
             currentPage === 1
@@ -209,7 +224,7 @@ export function Pagination({
         </span>
 
         <Link
-          href={`?page=${currentPage + 1}`}
+          href={pageHref(currentPage + 1)}
           aria-disabled={currentPage === totalPages}
           className={`rounded-xl border px-4 py-2 font-medium transition ${
             currentPage === totalPages
