@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { Pagination } from "../../../components/design";
 
 type Pago = {
   pago_id: string;
   orden_id: string;
   comprador_id: string;
+  comprador_nombre?: string | null;
   vendedor_id: string;
+  vendedor_nombre?: string | null;
   monto_producto: number;
   monto_envio: number;
   monto_total: number;
@@ -29,10 +32,12 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const PAGE_SIZE = 5;
 
 async function obtenerCompras(compradorId: string): Promise<Pago[]> {
+  const cookie = (await headers()).get("cookie");
   const res = await fetch(
     `${baseUrl}/api/pagos?rol=comprador&comprador_id=${compradorId}`,
     {
       cache: "no-store",
+      headers: cookie ? { cookie } : undefined,
     }
   );
 
@@ -110,6 +115,16 @@ function formatearFecha(fecha: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(fecha));
+}
+
+function formatearPersona(nombre: string | null | undefined, id: string, rol: string) {
+  if (nombre?.trim()) {
+    return nombre;
+  }
+
+  const numeroLegible = id.match(/\d+$/)?.[0];
+
+  return numeroLegible ? `${rol} ${numeroLegible}` : rol;
 }
 
 function estadoClase(estado: string) {
@@ -359,8 +374,12 @@ export default async function PagosPage({ searchParams }: PageProps) {
                           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6f7f6d]">
                             Vendedor
                           </p>
-                          <p className="mt-2 break-all font-bold text-[#37413d]">
-                            {compra.vendedor_id}
+                          <p className="mt-2 font-bold text-[#37413d]">
+                            {formatearPersona(
+                              compra.vendedor_nombre,
+                              compra.vendedor_id,
+                              "Vendedor"
+                            )}
                           </p>
                         </div>
 
@@ -391,6 +410,28 @@ export default async function PagosPage({ searchParams }: PageProps) {
                           </p>
                         </div>
                       </div>
+
+                      {compra.estado === "pendiente" && (
+                        <div className="mt-4 border-t border-[#d9ddcf] pt-4">
+                          <Link
+                            href={`/pago/${compra.orden_id}`}
+                            className="inline-flex w-full items-center justify-center rounded-full bg-[#a8bba0] px-5 py-3 font-black text-[#17211f] shadow-[0_16px_38px_rgba(168,187,160,0.28)] transition hover:-translate-y-0.5 hover:bg-[#c1d0ba] sm:w-auto"
+                          >
+                            Pagar ahora
+                          </Link>
+                        </div>
+                      )}
+
+                      {compra.estado === "aprobado" && (
+                        <div className="mt-4 border-t border-[#d9ddcf] pt-4">
+                          <a
+                            href={`/api/pagos/${compra.pago_id}/comprobante`}
+                            className="inline-flex w-full items-center justify-center rounded-full border border-[#a8bba0] bg-white px-5 py-3 font-black text-[#37413d] transition hover:-translate-y-0.5 hover:bg-[#f6f1e7] sm:w-auto"
+                          >
+                            Descargar comprobante
+                          </a>
+                        </div>
+                      )}
                     </article>
                   ))}
 

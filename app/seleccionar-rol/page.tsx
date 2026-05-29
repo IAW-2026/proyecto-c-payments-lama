@@ -104,8 +104,7 @@ export default function SeleccionarRolPage() {
 
   const puedeComprar = roles.includes("comprador");
   const puedeVender = roles.includes("vendedor");
-  const esSuperadmin =
-    roles.includes("super_admin") || roles.includes("superadmin");
+  const esSuperadmin = roles.includes("super_admin");
   const rolesDisponibles = [
     puedeComprar,
     puedeVender,

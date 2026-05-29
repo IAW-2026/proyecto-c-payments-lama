@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { Pagination } from "../../../components/design";
 
 type Pago = {
   pago_id: string;
   orden_id: string;
   comprador_id: string;
+  comprador_nombre?: string | null;
+  comprador_email?: string | null;
   vendedor_id: string;
   monto_producto: number;
   monto_envio: number;
@@ -17,6 +20,7 @@ type Pago = {
   estado: string;
   proveedor: string;
   fecha_creacion: string;
+  liquidado?: boolean;
 };
 
 type PageProps = {
@@ -25,6 +29,7 @@ type PageProps = {
     periodo?: string | string[];
     semana?: string | string[];
     mes?: string | string[];
+    estado?: string | string[];
   }>;
 };
 
@@ -32,10 +37,12 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const PAGE_SIZE = 5;
 
 async function obtenerVentas(vendedorId: string): Promise<Pago[]> {
+  const cookie = (await headers()).get("cookie");
   const res = await fetch(
     `${baseUrl}/api/pagos?rol=vendedor&vendedor_id=${vendedorId}`,
     {
       cache: "no-store",
+      headers: cookie ? { cookie } : undefined,
     }
   );
 
@@ -94,17 +101,26 @@ function filtrarPorPeriodo(
   pagos: Pago[],
   periodo: string,
   semana: string,
-  mes: string
+  mes: string,
+  estado: string
 ) {
-  if (periodo === "semana") {
-    return pagos.filter((pago) => obtenerSemana(new Date(pago.fecha_creacion)) === semana);
-  }
+  return pagos.filter((pago) => {
+    const coincideEstado = estado === "todos" || pago.estado === estado;
 
-  if (periodo === "mes") {
-    return pagos.filter((pago) => obtenerMes(new Date(pago.fecha_creacion)) === mes);
-  }
+    if (!coincideEstado) {
+      return false;
+    }
 
-  return pagos;
+    if (periodo === "semana") {
+      return obtenerSemana(new Date(pago.fecha_creacion)) === semana;
+    }
+
+    if (periodo === "mes") {
+      return obtenerMes(new Date(pago.fecha_creacion)) === mes;
+    }
+
+    return true;
+  });
 }
 
 function formatearFecha(fecha: string) {
@@ -113,6 +129,10 @@ function formatearFecha(fecha: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(fecha));
+}
+
+function nombreComprador(nombre: string | null | undefined) {
+  return nombre?.trim() || "Comprador";
 }
 
 function estadoClase(estado: string) {
@@ -125,6 +145,24 @@ function estadoClase(estado: string) {
   }
 
   return "border-white/18 bg-white/10 text-white/70";
+}
+
+function liquidacionTexto(venta: Pago) {
+  if (venta.estado !== "aprobado") {
+    return "No disponible";
+  }
+
+  return venta.liquidado ? "Liquidado" : "A cobrar";
+}
+
+function liquidacionClase(venta: Pago) {
+  if (venta.estado !== "aprobado") {
+    return "border-[#d9ddcf] bg-[#f6f1e7] text-[#6f7f6d]";
+  }
+
+  return venta.liquidado
+    ? "border-[#a8bba0] bg-[#a8bba0] text-[#17211f]"
+    : "border-[#d8ccb8] bg-[#f6f1e7] text-[#515922]";
 }
 
 function MetricGlass({
@@ -183,6 +221,7 @@ export default async function VentasPage({ searchParams }: PageProps) {
   }
 
   const periodo = obtenerPeriodo(params?.periodo);
+  const estado = obtenerParametro(params?.estado) || "todos";
   const semanaSeleccionada =
     obtenerParametro(params?.semana) || obtenerSemana(new Date());
   const mesSeleccionado = obtenerParametro(params?.mes) || obtenerMes(new Date());
@@ -191,7 +230,8 @@ export default async function VentasPage({ searchParams }: PageProps) {
     ventas,
     periodo,
     semanaSeleccionada,
-    mesSeleccionado
+    mesSeleccionado,
+    estado
   );
   const totalPages = Math.max(1, Math.ceil(ventasFiltradas.length / PAGE_SIZE));
   const currentPage = Math.min(obtenerPagina(params?.page), totalPages);
@@ -207,10 +247,9 @@ export default async function VentasPage({ searchParams }: PageProps) {
     (total, venta) => total + venta.monto_neto,
     0
   );
-  const comisiones = ventasFiltradas.reduce(
-    (total, venta) => total + venta.comision,
-    0
-  );
+  const aCobrar = ventasFiltradas
+    .filter((venta) => venta.estado === "aprobado" && !venta.liquidado)
+    .reduce((total, venta) => total + venta.monto_neto, 0);
 
   return (
     <main className="lama-home relative min-h-screen overflow-x-hidden bg-[#17211f] text-white">
@@ -271,8 +310,8 @@ export default async function VentasPage({ searchParams }: PageProps) {
                 accent
               />
               <MetricGlass
-                label="Comisiones"
-                value={formatearMonto(comisiones)}
+                label="A cobrar"
+                value={formatearMonto(aCobrar)}
               />
             </div>
           </div>
@@ -305,6 +344,20 @@ export default async function VentasPage({ searchParams }: PageProps) {
                     <option value="todos">Todos</option>
                     <option value="semana">Semana</option>
                     <option value="mes">Mes</option>
+                  </select>
+                </label>
+                <label className="grid min-w-0 gap-2 text-sm font-bold text-[#37413d]">
+                  Estado
+                  <select
+                    name="estado"
+                    defaultValue={estado}
+                    className="min-w-0 rounded-xl border border-[#d9ddcf] bg-white px-3 py-2.5 font-semibold text-[#37413d]"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="aprobado">Aprobado</option>
+                    <option value="rechazado">Rechazado</option>
+                    <option value="cancelado">Cancelado</option>
                   </select>
                 </label>
                 <label className="grid min-w-0 gap-2 text-sm font-bold text-[#37413d]">
@@ -367,6 +420,13 @@ export default async function VentasPage({ searchParams }: PageProps) {
                         >
                           {venta.estado}
                         </span>
+                        <span
+                          className={`w-fit rounded-full border px-4 py-2 text-sm font-black ${liquidacionClase(
+                            venta
+                          )}`}
+                        >
+                          {liquidacionTexto(venta)}
+                        </span>
                       </div>
 
                       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -374,9 +434,14 @@ export default async function VentasPage({ searchParams }: PageProps) {
                           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6f7f6d]">
                             Comprador
                           </p>
-                          <p className="mt-2 break-all font-bold text-[#37413d]">
-                            {venta.comprador_id}
+                          <p className="mt-2 font-bold text-[#37413d]">
+                            {nombreComprador(venta.comprador_nombre)}
                           </p>
+                          {venta.comprador_email && (
+                            <p className="mt-1 break-all text-sm font-semibold text-[#6f7f6d]">
+                              {venta.comprador_email}
+                            </p>
+                          )}
                         </div>
 
                         <div className="lama-compact-detail bg-[#f6f1e7]">
@@ -444,6 +509,7 @@ export default async function VentasPage({ searchParams }: PageProps) {
                     itemLabel="ventas"
                     searchParams={{
                       periodo,
+                      estado,
                       semana: semanaSeleccionada,
                       mes: mesSeleccionado,
                     }}

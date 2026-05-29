@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { Pagination } from "../../components/design";
 
 type Pago = {
   pago_id: string;
   orden_id: string;
   comprador_id: string;
+  comprador_nombre?: string | null;
+  comprador_email?: string | null;
   vendedor_id: string;
+  vendedor_nombre?: string | null;
   monto_producto: number;
   monto_envio: number;
   comision: number;
@@ -17,6 +21,7 @@ type Pago = {
   estado: string;
   proveedor: string;
   fecha_creacion: string;
+  liquidado?: boolean;
 };
 
 type PageProps = {
@@ -27,6 +32,7 @@ type PageProps = {
     mes?: string | string[];
     comprador?: string | string[];
     vendedor?: string | string[];
+    estado?: string | string[];
   }>;
 };
 
@@ -34,8 +40,10 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const PAGE_SIZE = 5;
 
 async function obtenerPagos(): Promise<Pago[]> {
+  const cookie = (await headers()).get("cookie");
   const res = await fetch(`${baseUrl}/api/pagos?rol=super_admin`, {
     cache: "no-store",
+    headers: cookie ? { cookie } : undefined,
   });
 
   const data = await res.json();
@@ -96,6 +104,7 @@ function filtrarPagos({
   mes,
   comprador,
   vendedor,
+  estado,
 }: {
   pagos: Pago[];
   periodo: string;
@@ -103,6 +112,7 @@ function filtrarPagos({
   mes: string;
   comprador: string;
   vendedor: string;
+  estado: string;
 }) {
   const compradorNormalizado = comprador.trim().toLowerCase();
   const vendedorNormalizado = vendedor.trim().toLowerCase();
@@ -117,12 +127,19 @@ function filtrarPagos({
           : true;
     const coincideComprador =
       compradorNormalizado === "" ||
-      pago.comprador_id.toLowerCase().includes(compradorNormalizado);
+      pago.comprador_id.toLowerCase().includes(compradorNormalizado) ||
+      (pago.comprador_nombre || "")
+        .toLowerCase()
+        .includes(compradorNormalizado);
     const coincideVendedor =
       vendedorNormalizado === "" ||
-      pago.vendedor_id.toLowerCase().includes(vendedorNormalizado);
+      pago.vendedor_id.toLowerCase().includes(vendedorNormalizado) ||
+      (pago.vendedor_nombre || "")
+        .toLowerCase()
+        .includes(vendedorNormalizado);
+    const coincideEstado = estado === "todos" || pago.estado === estado;
 
-    return coincidePeriodo && coincideComprador && coincideVendedor;
+    return coincidePeriodo && coincideComprador && coincideVendedor && coincideEstado;
   });
 }
 
@@ -132,6 +149,20 @@ function formatearFecha(fecha: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(fecha));
+}
+
+function nombrePersona(nombre: string | null | undefined, fallback: string) {
+  return nombre?.trim() || fallback;
+}
+
+function aliasVendedor(nombre: string | null | undefined, id: string) {
+  if (nombre?.trim()) {
+    return nombre;
+  }
+
+  const numeroLegible = id.match(/\d+$/)?.[0];
+
+  return numeroLegible ? `Vendedor ${numeroLegible}` : "Vendedor";
 }
 
 function estadoClase(estado: string) {
@@ -144,6 +175,21 @@ function estadoClase(estado: string) {
   }
 
   return "border-white/18 bg-white/10 text-white/70";
+}
+
+function estaPendienteDemorado(pago: Pago) {
+  const horasPendiente =
+    (Date.now() - new Date(pago.fecha_creacion).getTime()) / 3600000;
+
+  return pago.estado === "pendiente" && horasPendiente >= 48;
+}
+
+function liquidacionTexto(pago: Pago) {
+  if (pago.estado !== "aprobado") {
+    return "No disponible";
+  }
+
+  return pago.liquidado ? "Liquidado" : "A liberar";
 }
 
 function MetricGlass({
@@ -232,6 +278,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
   const mesSeleccionado = obtenerParametro(params?.mes) || obtenerMes(new Date());
   const comprador = obtenerParametro(params?.comprador) || "";
   const vendedor = obtenerParametro(params?.vendedor) || "";
+  const estado = obtenerParametro(params?.estado) || "todos";
   const pagos = await obtenerPagos();
   const pagosFiltrados = filtrarPagos({
     pagos,
@@ -240,6 +287,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
     mes: mesSeleccionado,
     comprador,
     vendedor,
+    estado,
   });
   const totalPages = Math.max(1, Math.ceil(pagosFiltrados.length / PAGE_SIZE));
   const currentPage = Math.min(obtenerPagina(params?.page), totalPages);
@@ -261,6 +309,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
     (total, pago) => total + pago.comision,
     0
   );
+  const pendientesDemorados = pagosFiltrados.filter(estaPendienteDemorado);
 
   return (
     <main className="lama-home relative min-h-screen overflow-x-hidden bg-[#17211f] text-white">
@@ -322,6 +371,10 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                 label="Comisiones"
                 value={formatearMonto(comisiones)}
               />
+              <MetricGlass
+                label="Alertas"
+                value={pendientesDemorados.length}
+              />
             </div>
           </div>
 
@@ -356,6 +409,20 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                   </select>
                 </label>
                 <label className="grid min-w-0 gap-2 text-sm font-bold text-[#37413d]">
+                  Estado
+                  <select
+                    name="estado"
+                    defaultValue={estado}
+                    className="min-w-0 rounded-xl border border-[#d9ddcf] bg-white px-3 py-2.5 font-semibold text-[#37413d]"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="aprobado">Aprobado</option>
+                    <option value="rechazado">Rechazado</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                </label>
+                <label className="grid min-w-0 gap-2 text-sm font-bold text-[#37413d]">
                   Semana
                   <input
                     type="week"
@@ -379,7 +446,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                     type="search"
                     name="comprador"
                     defaultValue={comprador}
-                    placeholder="ID comprador"
+                    placeholder="Nombre o ID"
                     className="min-w-0 rounded-xl border border-[#d9ddcf] bg-white px-3 py-2.5 font-semibold text-[#37413d] placeholder:text-[#9aadb0]"
                   />
                 </label>
@@ -389,7 +456,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                     type="search"
                     name="vendedor"
                     defaultValue={vendedor}
-                    placeholder="ID vendedor"
+                    placeholder="Nombre o ID"
                     className="min-w-0 rounded-xl border border-[#d9ddcf] bg-white px-3 py-2.5 font-semibold text-[#37413d] placeholder:text-[#9aadb0]"
                   />
                 </label>
@@ -406,6 +473,20 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                   Limpiar
                 </Link>
               </form>
+
+              {pendientesDemorados.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-[#d8ccb8] bg-[#fff7e8] p-4 text-[#515922]">
+                  <p className="text-xs font-black uppercase tracking-[0.18em]">
+                    Alerta de seguimiento
+                  </p>
+                  <p className="mt-2 font-bold">
+                    Hay {pendientesDemorados.length} pago
+                    {pendientesDemorados.length === 1 ? "" : "s"} pendiente
+                    {pendientesDemorados.length === 1 ? "" : "s"} hace más de
+                    48 horas.
+                  </p>
+                </div>
+              )}
 
               {pagosFiltrados.length === 0 ? (
                 <div className="mt-5 rounded-2xl border border-dashed border-[#9aadb0] bg-white/60 p-6 text-[#5f7269]">
@@ -435,11 +516,28 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                         >
                           {pago.estado}
                         </span>
+                        {estaPendienteDemorado(pago) && (
+                          <span className="w-fit rounded-full border border-[#d8ccb8] bg-[#fff7e8] px-4 py-2 text-sm font-black text-[#515922]">
+                            Pendiente +48 hs
+                          </span>
+                        )}
                       </div>
 
                       <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                        <DetailBox label="Comprador" value={pago.comprador_id} />
-                        <DetailBox label="Vendedor" value={pago.vendedor_id} />
+                        <DetailBox
+                          label="Comprador"
+                          value={nombrePersona(
+                            pago.comprador_nombre,
+                            "Comprador"
+                          )}
+                        />
+                        <DetailBox
+                          label="Vendedor"
+                          value={aliasVendedor(
+                            pago.vendedor_nombre,
+                            pago.vendedor_id
+                          )}
+                        />
                         <DetailBox label="Proveedor" value={pago.proveedor} />
                         <DetailBox
                           label="Fecha"
@@ -449,6 +547,10 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                           label="Total pagado"
                           value={formatearMonto(pago.monto_total)}
                           dark
+                        />
+                        <DetailBox
+                          label="Liquidación"
+                          value={liquidacionTexto(pago)}
                         />
                       </div>
 
@@ -474,6 +576,17 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                           </p>
                         </div>
                       </div>
+
+                      {pago.estado === "aprobado" && (
+                        <div className="mt-4 border-t border-[#d9ddcf] pt-4">
+                          <a
+                            href={`/api/pagos/${pago.pago_id}/comprobante`}
+                            className="inline-flex w-full items-center justify-center rounded-full border border-[#a8bba0] bg-white px-5 py-3 font-black text-[#37413d] transition hover:-translate-y-0.5 hover:bg-[#f6f1e7] sm:w-auto"
+                          >
+                            Descargar comprobante
+                          </a>
+                        </div>
+                      )}
                     </article>
                   ))}
 
@@ -485,6 +598,7 @@ export default async function MovimientosPage({ searchParams }: PageProps) {
                     itemLabel="pagos"
                     searchParams={{
                       periodo,
+                      estado,
                       semana: semanaSeleccionada,
                       mes: mesSeleccionado,
                       comprador,

@@ -78,7 +78,11 @@ export default function PagoPage() {
 
   const orden = {
     orden_id: ordenId,
-    comprador_id: "user_3DRaFo6JeyL5La245RLPa5SjHP5",
+    comprador: {
+      comprador_id: "user_3DRaFo6JeyL5La245RLPa5SjHP5",
+      nombre: "Ana Paz Bauser",
+      email: "test_user_503484223242855649@testuser.com",
+    },
     vendedor_id: "vend_1",
     producto: {
       titulo: "Campera Vintage Denim",
@@ -117,7 +121,7 @@ export default function PagoPage() {
     return null;
   }
 
-  if (user.id !== orden.comprador_id) {
+  if (user.id !== orden.comprador.comprador_id) {
     return (
       <PaymentMessage
         title="No tenés permiso para pagar esta orden"
@@ -158,9 +162,18 @@ export default function PagoPage() {
   }
 
   async function pagar() {
+    if (!user) {
+      router.push(signInUrl);
+      return;
+    }
+
     try {
       setCargando(true);
       setMensajeError(null);
+
+      const compradorEmail =
+        user.primaryEmailAddress?.emailAddress ||
+        orden.comprador.email;
 
       const pagoRes = await fetch("/api/pagos", {
         method: "POST",
@@ -169,17 +182,22 @@ export default function PagoPage() {
         },
         body: JSON.stringify({
           orden_id: orden.orden_id,
-          comprador_id: orden.comprador_id,
+          comprador: {
+            comprador_id: orden.comprador.comprador_id,
+            nombre: orden.comprador.nombre,
+            email: compradorEmail,
+          },
           vendedor_id: orden.vendedor_id,
           monto_producto: orden.producto.precio,
           monto_envio: orden.envio,
-          metodo_pago_id: "8b18b150-269f-44bb-870c-c9fabc0543fc",
+          monto_total: total,
         }),
       });
 
       const pagoData = await pagoRes.json();
+      const pagoYaExistia = pagoRes.status === 409;
 
-      if (!pagoRes.ok) {
+      if (!pagoRes.ok && !pagoYaExistia) {
         setMensajeError(
           pagoData.error ||
             "No pudimos registrar el pago. Revisá la orden e intentá nuevamente."
@@ -196,7 +214,7 @@ export default function PagoPage() {
           orden_id: orden.orden_id,
           titulo: orden.producto.titulo,
           monto_total: total,
-          comprador_email: "test_user_503484223242855649@testuser.com",
+          comprador_email: compradorEmail,
         }),
       });
 
