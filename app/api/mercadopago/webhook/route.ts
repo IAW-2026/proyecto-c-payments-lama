@@ -273,12 +273,32 @@ export async function POST(req: NextRequest) {
       })
       .eq("orden_id", ordenId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (errorPago) {
-      console.log("Error actualizando pago:", errorPago);
+      console.log("Error actualizando pago:", {
+        orden_id: ordenId,
+        mercado_pago_payment_id: mercadoPagoPaymentId,
+        error: errorPago,
+      });
 
       return NextResponse.json({ error: errorPago.message }, { status: 500 });
+    }
+
+    if (!pagoActualizado) {
+      console.log("No se encontro pago para actualizar desde webhook:", {
+        orden_id: ordenId,
+        mercado_pago_payment_id: mercadoPagoPaymentId,
+        estado_mercado_pago: estadoMercadoPago,
+      });
+
+      return NextResponse.json(
+        {
+          error: "No se encontro un pago pendiente para esa orden",
+          orden_id: ordenId,
+        },
+        { status: 404 }
+      );
     }
 
     console.log("Pago actualizado:", pagoActualizado);

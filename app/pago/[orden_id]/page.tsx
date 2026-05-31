@@ -24,16 +24,6 @@ function formatMoney(value: number) {
   return `$${value.toLocaleString("es-AR")}`;
 }
 
-async function leerJsonOpcional(res: Response) {
-  const text = await res.text();
-
-  if (!text) {
-    return null;
-  }
-
-  return JSON.parse(text) as { error?: string };
-}
-
 function PaymentMessage({
   title,
   description,
@@ -266,36 +256,6 @@ export default function PagoPage() {
         user.primaryEmailAddress?.emailAddress ||
         orden.comprador.email;
 
-      const pagoRes = await fetch("/api/pagos", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orden_id: orden.orden_id,
-          comprador: {
-            comprador_id: orden.comprador.comprador_id,
-            nombre: orden.comprador.nombre,
-            email: compradorEmail,
-          },
-          vendedor_id: orden.vendedor_id,
-          monto_producto: orden.monto_producto,
-          monto_envio: orden.monto_envio,
-          monto_total: total,
-        }),
-      });
-
-      const pagoData = await leerJsonOpcional(pagoRes);
-      const pagoYaExistia = pagoRes.status === 409;
-
-      if (!pagoRes.ok && !pagoYaExistia) {
-        setMensajeError(
-          pagoData?.error ||
-            "No pudimos registrar el pago. Revisá la orden e intentá nuevamente."
-        );
-        return;
-      }
-
       const mpRes = await fetch("/api/mercadopago/preferencia", {
         method: "POST",
         headers: {
@@ -304,6 +264,14 @@ export default function PagoPage() {
         body: JSON.stringify({
           orden_id: orden.orden_id,
           titulo: orden.producto_titulo,
+          comprador: {
+            comprador_id: orden.comprador.comprador_id,
+            nombre: orden.comprador.nombre,
+            email: compradorEmail,
+          },
+          vendedor_id: orden.vendedor_id,
+          monto_producto: orden.monto_producto,
+          monto_envio: orden.monto_envio,
           monto_total: total,
           comprador_email: compradorEmail,
         }),

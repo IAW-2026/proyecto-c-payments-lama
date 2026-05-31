@@ -1,22 +1,144 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { preferenceClient } from "@/lib/mercadopago";
+import { supabase } from "@/lib/supabase";
 
 const baseUrl =
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+function obtenerTexto(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Debes iniciar sesion para crear la preferencia" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
+    const comprador = body.comprador;
 
-    const { orden_id, titulo, monto_total, comprador_email } = body;
+    const comprador_id = obtenerTexto(
+      comprador?.comprador_id ?? body.comprador_id
+    );
+    const comprador_nombre = obtenerTexto(
+      comprador?.nombre ?? body.comprador_nombre
+    );
+    const comprador_email = obtenerTexto(
+      comprador?.email ?? body.comprador_email
+    );
+    const vendedor_id = obtenerTexto(body.vendedor_id);
 
-    if (!orden_id || !titulo || !monto_total || !comprador_email) {
+    const {
+      orden_id,
+      titulo,
+      monto_producto,
+      monto_envio = 0,
+      monto_total,
+    } = body;
+
+    if (
+      !orden_id ||
+      !titulo ||
+      !comprador_id ||
+      !comprador_nombre ||
+      !comprador_email ||
+      !vendedor_id
+    ) {
       return NextResponse.json(
         {
-          error: "Faltan datos obligatorios para crear la preferencia",
+          error:
+            "Faltan datos obligatorios para crear el pago y la preferencia",
         },
         { status: 400 }
       );
+    }
+
+    if (comprador_id !== userId) {
+      return NextResponse.json(
+        { error: "No podes crear una preferencia para otro comprador" },
+        { status: 403 }
+      );
+    }
+
+    if (typeof monto_producto !== "number" || monto_producto <= 0) {
+      return NextResponse.json(
+        { error: "monto_producto debe ser un numero positivo" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof monto_envio !== "number" || monto_envio < 0) {
+      return NextResponse.json(
+        { error: "monto_envio debe ser un numero mayor o igual a 0" },
+        { status: 400 }
+      );
+    }
+
+    const montoTotalCalculado = monto_producto + monto_envio;
+
+    if (
+      typeof monto_total !== "number" ||
+      monto_total !== montoTotalCalculado
+    ) {
+      return NextResponse.json(
+        { error: "monto_total debe coincidir con producto + envio" },
+        { status: 400 }
+      );
+    }
+
+    const pagoExistente = await supabase
+      .from("pago")
+      .select("pago_id")
+      .eq("orden_id", orden_id)
+      .maybeSingle();
+
+    if (pagoExistente.error) {
+      return NextResponse.json(
+        { error: pagoExistente.error.message },
+        { status: 500 }
+      );
+    }
+
+    if (!pagoExistente.data) {
+      const porcentajeComision = 0.1;
+      const comision = monto_producto * porcentajeComision;
+      const monto_neto = monto_producto - comision;
+
+      const { error: errorPago } = await supabase
+        .from("pago")
+        .insert([
+          {
+            orden_id,
+            comprador_id,
+            comprador_nombre,
+            comprador_email,
+            vendedor_id,
+            monto_producto,
+            monto_envio,
+            comision,
+            monto_neto,
+            monto_total: montoTotalCalculado,
+            moneda: "ARS",
+            estado: "pendiente",
+            proveedor: "MERCADO_PAGO",
+          },
+        ])
+        .select("pago_id")
+        .single();
+
+      if (errorPago) {
+        return NextResponse.json(
+          { error: errorPago.message },
+          { status: 500 }
+        );
+      }
     }
 
     console.log("Base URL usada:", baseUrl);
