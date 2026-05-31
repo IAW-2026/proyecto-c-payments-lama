@@ -13,11 +13,23 @@ type WebhookMercadoPago = {
   type?: string;
 };
 
+const SELLER_APP_URL =
+  (
+    process.env.SELLER_APP_URL || "https://proyecto-c-seller-lama.vercel.app"
+  ).replace(/\/$/, "");
+const SELLER_APP_API_KEY = process.env.SELLER_APP_API_KEY;
+
 function mapearEstadoMercadoPago(status: string) {
   if (status === "approved") return "aprobado";
   if (status === "rejected") return "rechazado";
   if (status === "cancelled") return "cancelado";
   return "pendiente";
+}
+
+function mapearEstadoParaSellerApp(
+  estadoPago: "pendiente" | "aprobado" | "rechazado" | "cancelado"
+) {
+  return estadoPago === "cancelado" ? "rechazado" : estadoPago;
 }
 
 function obtenerTipoTransaccion(status: string) {
@@ -135,15 +147,43 @@ async function notificarSellerApp({
   pagoId: string;
   motivo?: string;
 }) {
-  console.log("Mock Seller App - actualizar estado de pago:", {
-    endpoint: `PATCH /api/ordenes-ventas/${ordenId}/estado-pago`,
-    request: {
-      orden_id: ordenId,
-      estado_pago: estadoPago,
+  const estadoSeller = mapearEstadoParaSellerApp(estadoPago);
+  const url = `${SELLER_APP_URL}/api/ordenes-ventas/${encodeURIComponent(
+    ordenId
+  )}/estado-pago`;
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  if (SELLER_APP_API_KEY) {
+    headers.Authorization = `Bearer ${SELLER_APP_API_KEY}`;
+  }
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({
+      estado_pago: estadoSeller,
       pago_id: pagoId,
-      motivo: motivo || "Actualización recibida desde Payments App",
-    },
+      motivo: motivo || "Actualizacion recibida desde Payments App",
+    }),
   });
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    console.error("Seller App rechazo la actualizacion de pago:", {
+      status: res.status,
+      orden_id: ordenId,
+      response: data,
+    });
+
+    throw new Error("No se pudo notificar el estado de pago a Seller App");
+  }
+
+  console.log("Seller App actualizada:", data);
+
+  return data;
 }
 
 export async function POST(req: NextRequest) {
@@ -243,12 +283,21 @@ export async function POST(req: NextRequest) {
 
     console.log("Pago actualizado:", pagoActualizado);
 
-    await notificarSellerApp({
-      ordenId,
-      estadoPago,
-      pagoId: pagoActualizado.pago_id,
-      motivo: pagoMercadoPago.status_detail || undefined,
-    });
+    try {
+      await notificarSellerApp({
+        ordenId,
+        estadoPago,
+        pagoId: pagoActualizado.pago_id,
+        motivo: pagoMercadoPago.status_detail || undefined,
+      });
+    } catch (error) {
+      console.error("Error notificando Seller App:", error);
+
+      return NextResponse.json(
+        { error: "No se pudo notificar el pago a Seller App" },
+        { status: 502 }
+      );
+    }
 
     const { data: transaccionExistente, error: errorBuscandoTransaccion } =
       await supabase

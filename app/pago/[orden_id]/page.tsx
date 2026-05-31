@@ -6,8 +6,32 @@ import type { ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useClerk, useUser } from "@clerk/nextjs";
 
+type OrdenCheckout = {
+  orden_id: string;
+  comprador: {
+    comprador_id: string;
+    nombre: string;
+    email: string;
+  };
+  vendedor_id: string;
+  producto_titulo: string;
+  monto_producto: number;
+  monto_envio: number;
+  monto_total: number;
+};
+
 function formatMoney(value: number) {
   return `$${value.toLocaleString("es-AR")}`;
+}
+
+async function leerJsonOpcional(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return null;
+  }
+
+  return JSON.parse(text) as { error?: string };
 }
 
 function PaymentMessage({
@@ -69,31 +93,19 @@ export default function PagoPage() {
   const params = useParams();
   const router = useRouter();
   const ordenId = params.orden_id as string;
+  const redirectPath = `/pago/${ordenId}`;
 
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
 
   const [cargando, setCargando] = useState(false);
+  const [cargandoOrden, setCargandoOrden] = useState(false);
   const [mensajeError, setMensajeError] = useState<string | null>(null);
+  const [orden, setOrden] = useState<OrdenCheckout | null>(null);
 
-  const orden = {
-    orden_id: ordenId,
-    comprador: {
-      comprador_id: "user_3DRaFo6JeyL5La245RLPa5SjHP5",
-      nombre: "Ana Paz Bauser",
-      email: "test_user_503484223242855649@testuser.com",
-    },
-    vendedor_id: "vend_1",
-    producto: {
-      titulo: "Campera Vintage Denim",
-      precio: 1,
-    },
-    envio: 3,
-  };
-
-  const total = orden.producto.precio + orden.envio;
+  const total = orden?.monto_total || 0;
   const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(
-    `/pago/${ordenId}`
+    redirectPath
   )}`;
 
   useEffect(() => {
@@ -102,7 +114,73 @@ export default function PagoPage() {
     }
   }, [isLoaded, router, signInUrl, user]);
 
-  if (!isLoaded) {
+  useEffect(() => {
+    if (!isLoaded || !user || !orden) {
+      return;
+    }
+
+    if (user.id !== orden.comprador.comprador_id) {
+      signOut({
+        redirectUrl: signInUrl,
+      });
+    }
+  }, [isLoaded, orden, signInUrl, signOut, user]);
+
+  useEffect(() => {
+    if (!isLoaded || !user) {
+      return;
+    }
+
+    let cancelado = false;
+
+    async function cargarOrden() {
+      try {
+        setCargandoOrden(true);
+        setMensajeError(null);
+
+        const res = await fetch(
+          `/api/ordenes/${encodeURIComponent(ordenId)}/checkout`
+        );
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          if (res.status === 403) {
+            await signOut({
+              redirectUrl: `/sign-in?redirect_url=${encodeURIComponent(
+                redirectPath
+              )}`,
+            });
+            return;
+          }
+
+          setMensajeError(
+            data?.error ||
+              "No pudimos obtener los datos de la orden desde Buyer App."
+          );
+          return;
+        }
+
+        if (!cancelado) {
+          setOrden(data as OrdenCheckout);
+        }
+      } catch (error) {
+        console.error(error);
+        setMensajeError("Ocurrió un error al buscar los datos de la orden.");
+      } finally {
+        if (!cancelado) {
+          setCargandoOrden(false);
+        }
+      }
+    }
+
+    cargarOrden();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [isLoaded, ordenId, redirectPath, signOut, user]);
+
+  if (!isLoaded || cargandoOrden) {
     return (
       <main className="lama-home relative grid min-h-screen place-items-center overflow-hidden bg-[#17211f] text-white">
         <div className="lama-hero-image absolute inset-0 opacity-45" />
@@ -121,26 +199,34 @@ export default function PagoPage() {
     return null;
   }
 
-  if (user.id !== orden.comprador.comprador_id) {
+  if (!orden && !mensajeError) {
+    return null;
+  }
+
+  if (!orden && mensajeError) {
     return (
       <PaymentMessage
-        title="No tenés permiso para pagar esta orden"
-        description="Esta orden pertenece a otro comprador."
+        title="No se pudo cargar la orden"
+        description={mensajeError}
         action={
           <button
             type="button"
-            onClick={async () => {
-              await signOut({
-                redirectUrl: signInUrl,
-              });
-            }}
+            onClick={() => window.location.reload()}
             className="mt-6 w-full rounded-full bg-[#a8bba0] px-6 py-4 font-black text-[#17211f] shadow-[0_22px_58px_rgba(168,187,160,0.26)] transition hover:-translate-y-0.5 hover:bg-[#c1d0ba]"
           >
-            Cerrar sesión e ingresar con otro usuario
+            Volver a intentar
           </button>
         }
       />
     );
+  }
+
+  if (!orden) {
+    return null;
+  }
+
+  if (user.id !== orden.comprador.comprador_id) {
+    return null;
   }
 
   if (mensajeError) {
@@ -167,6 +253,11 @@ export default function PagoPage() {
       return;
     }
 
+    if (!orden) {
+      setMensajeError("No se cargaron los datos de la orden.");
+      return;
+    }
+
     try {
       setCargando(true);
       setMensajeError(null);
@@ -188,18 +279,18 @@ export default function PagoPage() {
             email: compradorEmail,
           },
           vendedor_id: orden.vendedor_id,
-          monto_producto: orden.producto.precio,
-          monto_envio: orden.envio,
+          monto_producto: orden.monto_producto,
+          monto_envio: orden.monto_envio,
           monto_total: total,
         }),
       });
 
-      const pagoData = await pagoRes.json();
+      const pagoData = await leerJsonOpcional(pagoRes);
       const pagoYaExistia = pagoRes.status === 409;
 
       if (!pagoRes.ok && !pagoYaExistia) {
         setMensajeError(
-          pagoData.error ||
+          pagoData?.error ||
             "No pudimos registrar el pago. Revisá la orden e intentá nuevamente."
         );
         return;
@@ -212,7 +303,7 @@ export default function PagoPage() {
         },
         body: JSON.stringify({
           orden_id: orden.orden_id,
-          titulo: orden.producto.titulo,
+          titulo: orden.producto_titulo,
           monto_total: total,
           comprador_email: compradorEmail,
         }),
@@ -280,7 +371,7 @@ export default function PagoPage() {
           <div className="mt-9 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/12 bg-white/[0.08] px-5 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.22)] backdrop-blur-xl">
               <p className="text-3xl font-black text-white">
-                {formatMoney(orden.producto.precio)}
+                {formatMoney(orden.monto_producto)}
               </p>
               <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-white/48">
                 Producto
@@ -288,7 +379,7 @@ export default function PagoPage() {
             </div>
             <div className="rounded-2xl border border-white/12 bg-white/[0.08] px-5 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.22)] backdrop-blur-xl">
               <p className="text-3xl font-black text-white">
-                {formatMoney(orden.envio)}
+                {formatMoney(orden.monto_envio)}
               </p>
               <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-white/48">
                 Envío
@@ -326,14 +417,17 @@ export default function PagoPage() {
             </div>
 
             <div className="mt-5 grid gap-3">
-              <DetailBox label="Producto" value={orden.producto.titulo} />
+              <DetailBox label="Producto" value={orden.producto_titulo} />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <DetailBox
                   label="Precio producto"
-                  value={formatMoney(orden.producto.precio)}
+                  value={formatMoney(orden.monto_producto)}
                 />
-                <DetailBox label="Envío" value={formatMoney(orden.envio)} />
+                <DetailBox
+                  label="Envío"
+                  value={formatMoney(orden.monto_envio)}
+                />
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">

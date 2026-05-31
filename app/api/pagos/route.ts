@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("pago")
       .insert([
         {
@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
           proveedor: "MERCADO_PAGO",
         },
       ])
-      .select()
+      .select("pago_id")
       .single();
 
     if (error) {
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return new NextResponse(null, { status: 201 });
   } catch {
     return NextResponse.json(
       { error: "Error interno del servidor" },
