@@ -64,9 +64,16 @@ export async function POST(req: NextRequest) {
       sandbox_init_point: preference.sandbox_init_point,
     });
 
+    const usaCredencialesSandbox =
+      process.env.MERCADO_PAGO_ACCESS_TOKEN?.startsWith("TEST-");
+    const checkoutUrl = usaCredencialesSandbox
+      ? preference.sandbox_init_point || preference.init_point
+      : preference.init_point || preference.sandbox_init_point;
+
     return NextResponse.json(
       {
         preference_id: preference.id,
+        checkout_url: checkoutUrl,
         init_point: preference.init_point,
         sandbox_init_point: preference.sandbox_init_point,
       },

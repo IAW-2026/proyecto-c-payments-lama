@@ -86,7 +86,7 @@ export default function PagoPage() {
     vendedor_id: "vend_1",
     producto: {
       titulo: "Campera Vintage Denim",
-      precio: 1,
+      precio: 100,
     },
     envio: 3,
   };
@@ -228,7 +228,17 @@ export default function PagoPage() {
         return;
       }
 
-      window.location.assign(mpData.sandbox_init_point);
+      const checkoutUrl =
+        mpData.checkout_url || mpData.init_point || mpData.sandbox_init_point;
+
+      if (!checkoutUrl) {
+        setMensajeError(
+          "Mercado Pago no devolviÃ³ una URL de checkout. IntentÃ¡ nuevamente."
+        );
+        return;
+      }
+
+      window.location.assign(checkoutUrl);
     } catch (error) {
       console.error(error);
       setMensajeError("Ocurrió un error inesperado. Intentá nuevamente.");
