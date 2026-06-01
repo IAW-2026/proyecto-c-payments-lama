@@ -188,6 +188,10 @@ export async function POST(req: NextRequest) {
           },
         ],
 
+        payer: {
+          email: comprador_email,
+        },
+
         external_reference: orden_id,
 
         metadata: {
