@@ -18,8 +18,7 @@ const SELLER_APP_URL =
     process.env.SELLER_APP_URL || "https://proyecto-c-seller-lama.vercel.app"
   ).replace(/\/$/, "");
 const SELLER_APP_API_KEY = process.env.SELLER_APP_API_KEY;
-const FORZAR_APROBADO_MERCADO_PAGO =
-  process.env.MERCADO_PAGO_FORZAR_APROBADO === "true";
+const FORZAR_APROBADO_MERCADO_PAGO = true;
 
 function mapearEstadoMercadoPago(status: string) {
   if (status === "approved") return "aprobado";
@@ -182,12 +181,19 @@ async function aprobarPagoForzadoDesdeWebhook(body: WebhookMercadoPago) {
     return null;
   }
 
-  await notificarSellerApp({
-    ordenId,
-    estadoPago: "aprobado",
-    pagoId: pagoActualizado.pago_id,
-    motivo: "Pago aprobado forzado para prueba de integracion",
-  });
+  try {
+    await notificarSellerApp({
+      ordenId,
+      estadoPago: "aprobado",
+      pagoId: pagoActualizado.pago_id,
+      motivo: "Pago aprobado forzado para prueba de integracion",
+    });
+  } catch (error) {
+    console.error(
+      "Modo forzado activo: no se pudo notificar Seller, pero Payments queda aprobado",
+      error
+    );
+  }
 
   const { data: transaccionExistente, error: errorBuscandoTransaccion } =
     await supabase
@@ -285,6 +291,10 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as WebhookMercadoPago;
 
     console.log("Webhook Mercado Pago recibido:", body);
+    console.log("Modo forzar aprobado Mercado Pago:", {
+      activo: FORZAR_APROBADO_MERCADO_PAGO,
+      origen: "forzado_en_codigo_para_pruebas",
+    });
 
     const mercadoPagoPaymentId = await obtenerPaymentIdDesdeWebhook(body);
 
