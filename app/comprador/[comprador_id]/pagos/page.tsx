@@ -139,6 +139,10 @@ function estadoClase(estado: string) {
   return "border-white/18 bg-white/10 text-white/70";
 }
 
+function puedeReintentarPago(estado: string) {
+  return estado === "pendiente" || estado === "rechazado";
+}
+
 function MetricGlass({
   label,
   value,
@@ -411,13 +415,15 @@ export default async function PagosPage({ searchParams }: PageProps) {
                         </div>
                       </div>
 
-                      {compra.estado === "pendiente" && (
+                      {puedeReintentarPago(compra.estado) && (
                         <div className="mt-4 border-t border-[#d9ddcf] pt-4">
                           <Link
                             href={`/pago/${compra.orden_id}`}
                             className="inline-flex w-full items-center justify-center rounded-full bg-[#a8bba0] px-5 py-3 font-black text-[#17211f] shadow-[0_16px_38px_rgba(168,187,160,0.28)] transition hover:-translate-y-0.5 hover:bg-[#c1d0ba] sm:w-auto"
                           >
-                            Pagar ahora
+                            {compra.estado === "rechazado"
+                              ? "Reintentar pago"
+                              : "Pagar ahora"}
                           </Link>
                         </div>
                       )}
