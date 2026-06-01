@@ -36,7 +36,7 @@ function normalizarOrden(data: OrdenCheckoutBuyer, ordenId: string) {
   const producto_titulo =
     obtenerTexto(data.producto?.titulo) ||
     obtenerTexto(data.titulo) ||
-    `Orden ${orden_id}`;
+    "Producto de la orden";
   const monto_producto =
     obtenerNumero(data.producto?.precio) ?? obtenerNumero(data.monto_producto);
   const monto_envio = obtenerNumero(data.monto_envio) ?? 0;

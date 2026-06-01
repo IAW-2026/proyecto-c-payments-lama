@@ -287,7 +287,9 @@ export default function PagoPage() {
         return;
       }
 
-      window.location.assign(mpData.sandbox_init_point);
+      window.location.assign(
+        mpData.checkout_url || mpData.init_point || mpData.sandbox_init_point
+      );
     } catch (error) {
       console.error(error);
       setMensajeError("Ocurrió un error inesperado. Intentá nuevamente.");

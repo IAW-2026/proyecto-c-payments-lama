@@ -5,6 +5,34 @@ import { supabase } from "@/lib/supabase";
 
 const baseUrl =
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const buyerAppUrl = (
+  process.env.BUYER_APP_URL || "https://proyecto-c-buyer2-lama.vercel.app"
+).replace(/\/$/, "");
+const mercadoPagoAccessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN || "";
+
+function obtenerCheckoutUrl({
+  initPoint,
+  sandboxInitPoint,
+}: {
+  initPoint?: string;
+  sandboxInitPoint?: string;
+}) {
+  const checkoutMode = process.env.MERCADO_PAGO_CHECKOUT_MODE;
+
+  if (checkoutMode === "sandbox") {
+    return sandboxInitPoint || initPoint;
+  }
+
+  if (checkoutMode === "production") {
+    return initPoint || sandboxInitPoint;
+  }
+
+  if (mercadoPagoAccessToken.startsWith("TEST-")) {
+    return sandboxInitPoint || initPoint;
+  }
+
+  return initPoint || sandboxInitPoint;
+}
 
 function obtenerTexto(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -171,9 +199,9 @@ export async function POST(req: NextRequest) {
         },
 
         back_urls: {
-          success: `${baseUrl}/pago/${orden_id}/exito`,
-          failure: `${baseUrl}/pago/${orden_id}/fallo`,
-          pending: `${baseUrl}/pago/${orden_id}/pendiente`,
+          success: buyerAppUrl,
+          failure: buyerAppUrl,
+          pending: buyerAppUrl,
         },
 
         notification_url: `${baseUrl}/api/mercadopago/webhook`,
@@ -186,11 +214,17 @@ export async function POST(req: NextRequest) {
       sandbox_init_point: preference.sandbox_init_point,
     });
 
+    const checkoutUrl = obtenerCheckoutUrl({
+      initPoint: preference.init_point,
+      sandboxInitPoint: preference.sandbox_init_point,
+    });
+
     return NextResponse.json(
       {
         preference_id: preference.id,
         init_point: preference.init_point,
         sandbox_init_point: preference.sandbox_init_point,
+        checkout_url: checkoutUrl,
       },
       { status: 201 }
     );
