@@ -88,8 +88,9 @@ export async function GET(req: NextRequest) {
     .from("transaccion_de_pago")
     .select("pago_id")
     .in("pago_id", pagoIds)
-    .eq("tipo_transaccion", "liberacion_vendedor")
-    .eq("estado", "aprobado");
+    .eq("tipo_transaccion", "captura")
+    .eq("estado", "aprobado")
+    .like("transaccion_proveedor_id", "VENDEDOR-%");
 
   if (errorLiberaciones) {
     return NextResponse.json(

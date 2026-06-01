@@ -82,7 +82,7 @@ async function notificarLiquidacionLogistico({
     apiKey: SHIPPING_APP_API_KEY,
     appName: "Shipping App",
     body: {
-      fecha_liquidacion_logistico: fechaActualizacion,
+      "fecha_actualización": fechaActualizacion,
     },
   });
 }
@@ -94,12 +94,25 @@ async function notificarLiquidacionesExternas({
   ordenId: string;
   fechaActualizacion: string;
 }) {
-  const [seller, shipping] = await Promise.all([
+  const [seller, shipping] = await Promise.allSettled([
     notificarLiquidacionVendedor({ ordenId, fechaActualizacion }),
     notificarLiquidacionLogistico({ ordenId, fechaActualizacion }),
   ]);
 
-  return { seller, shipping };
+  return {
+    seller:
+      seller.status === "fulfilled"
+        ? { ok: true, data: seller.value }
+        : { ok: false, error: obtenerMensajeError(seller.reason) },
+    shipping:
+      shipping.status === "fulfilled"
+        ? { ok: true, data: shipping.value }
+        : { ok: false, error: obtenerMensajeError(shipping.reason) },
+  };
+}
+
+function obtenerMensajeError(error: unknown) {
+  return error instanceof Error ? error.message : "Error desconocido";
 }
 
 export async function POST(req: NextRequest) {
@@ -140,46 +153,38 @@ export async function POST(req: NextRequest) {
       .from("transaccion_de_pago")
       .select("*")
       .eq("pago_id", pago.pago_id)
-      .in("tipo_transaccion", ["liberacion_vendedor", "pago_envio"]);
+      .eq("tipo_transaccion", "captura")
+      .eq("estado", "aprobado")
+      .in("transaccion_proveedor_id", [
+        `VENDEDOR-${pago.vendedor_id}`,
+        `ENVIO-${envio_id}`,
+      ]);
 
     if (transaccionesExistentes && transaccionesExistentes.length > 0) {
       const fechaActualizacion = new Date().toISOString();
+      const notificaciones = await notificarLiquidacionesExternas({
+        ordenId: pago.orden_id,
+        fechaActualizacion,
+      });
 
-      try {
-        const notificaciones = await notificarLiquidacionesExternas({
-          ordenId: pago.orden_id,
-          fechaActualizacion,
-        });
-
-        return NextResponse.json(
-          {
-            message:
-              "Este pago ya estaba liberado. Notificaciones externas reenviadas correctamente",
-            orden_id: pago.orden_id,
-            envio_id,
-            transacciones: transaccionesExistentes,
-            notificaciones,
-          },
-          { status: 200 }
-        );
-      } catch (error) {
-        console.error("Error reenviando liquidaciones externas:", error);
-
-        return NextResponse.json(
-          {
-            error:
-              "El pago ya estaba liberado, pero no se pudieron reenviar las notificaciones externas",
-          },
-          { status: 502 }
-        );
-      }
+      return NextResponse.json(
+        {
+          message:
+            "Este pago ya estaba liberado. Se reintentaron las notificaciones externas",
+          orden_id: pago.orden_id,
+          envio_id,
+          transacciones: transaccionesExistentes,
+          notificaciones,
+        },
+        { status: 200 }
+      );
     }
 
     const fechaActualizacion = new Date().toISOString();
     const transacciones = [
       {
         pago_id: pago.pago_id,
-        tipo_transaccion: "liberacion_vendedor",
+        tipo_transaccion: "captura",
         monto: pago.monto_neto,
         estado: "aprobado",
         transaccion_proveedor_id: `VENDEDOR-${pago.vendedor_id}`,
@@ -188,7 +193,7 @@ export async function POST(req: NextRequest) {
       },
       {
         pago_id: pago.pago_id,
-        tipo_transaccion: "pago_envio",
+        tipo_transaccion: "captura",
         monto: pago.monto_envio,
         estado: "aprobado",
         transaccion_proveedor_id: `ENVIO-${envio_id}`,
@@ -209,24 +214,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let notificaciones;
-
-    try {
-      notificaciones = await notificarLiquidacionesExternas({
-        ordenId: pago.orden_id,
-        fechaActualizacion,
-      });
-    } catch (error) {
-      console.error("Error notificando liquidaciones externas:", error);
-
-      return NextResponse.json(
-        {
-          error:
-            "Los fondos fueron liberados internamente, pero fallo la notificacion externa",
-        },
-        { status: 502 }
-      );
-    }
+    const notificaciones = await notificarLiquidacionesExternas({
+      ordenId: pago.orden_id,
+      fechaActualizacion,
+    });
 
     return NextResponse.json(
       {
