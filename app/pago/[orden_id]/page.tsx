@@ -93,7 +93,26 @@ export default function PagoPage() {
   const [mensajeError, setMensajeError] = useState<string | null>(null);
   const [orden, setOrden] = useState<OrdenCheckout | null>(null);
 
+<<<<<<< HEAD
+  const orden = {
+    orden_id: ordenId,
+    comprador: {
+      comprador_id: "user_3DRaFo6JeyL5La245RLPa5SjHP5",
+      nombre: "Ana Paz Bauser",
+      email: "test_user_503484223242855649@testuser.com",
+    },
+    vendedor_id: "vend_1",
+    producto: {
+      titulo: "Campera Vintage Denim",
+      precio: 100,
+    },
+    envio: 3,
+  };
+
+  const total = orden.producto.precio + orden.envio;
+=======
   const total = orden?.monto_total || 0;
+>>>>>>> 881a558e28c31a3872c3288f6ed9b79e5f714db2
   const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(
     redirectPath
   )}`;
@@ -287,9 +306,23 @@ export default function PagoPage() {
         return;
       }
 
+<<<<<<< HEAD
+      const checkoutUrl =
+        mpData.checkout_url || mpData.init_point || mpData.sandbox_init_point;
+
+      if (!checkoutUrl) {
+        setMensajeError(
+          "Mercado Pago no devolviÃ³ una URL de checkout. IntentÃ¡ nuevamente."
+        );
+        return;
+      }
+
+      window.location.assign(checkoutUrl);
+=======
       window.location.assign(
         mpData.checkout_url || mpData.init_point || mpData.sandbox_init_point
       );
+>>>>>>> 881a558e28c31a3872c3288f6ed9b79e5f714db2
     } catch (error) {
       console.error(error);
       setMensajeError("Ocurrió un error inesperado. Intentá nuevamente.");
