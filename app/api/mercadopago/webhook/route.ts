@@ -41,6 +41,10 @@ function obtenerTipoTransaccion(status: string) {
   return "autorizacion";
 }
 
+function aplicarForzadoSiCorresponde(status: string) {
+  return FORZAR_APROBADO_MERCADO_PAGO ? "approved" : status;
+}
+
 function extraerIdRecurso(body: WebhookMercadoPago) {
   if (body.data?.id || body.id) {
     return body.data?.id || body.id;
@@ -344,7 +348,9 @@ export async function POST(req: NextRequest) {
     });
 
     const ordenId = pagoMercadoPago.external_reference;
-    const estadoMercadoPago = pagoMercadoPago.status || "pending";
+    const estadoMercadoPago = aplicarForzadoSiCorresponde(
+      pagoMercadoPago.status || "pending"
+    );
     const estadoPago = mapearEstadoMercadoPago(estadoMercadoPago);
     const tipoTransaccion = obtenerTipoTransaccion(estadoMercadoPago);
     const monto = pagoMercadoPago.transaction_amount || 0;
@@ -420,10 +426,16 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error("Error notificando Seller App:", error);
 
-      return NextResponse.json(
-        { error: "No se pudo notificar el pago a Seller App" },
-        { status: 502 }
-      );
+      if (FORZAR_APROBADO_MERCADO_PAGO) {
+        console.log(
+          "Modo forzado activo: el pago queda aprobado aunque falle Seller App"
+        );
+      } else {
+        return NextResponse.json(
+          { error: "No se pudo notificar el pago a Seller App" },
+          { status: 502 }
+        );
+      }
     }
 
     const { data: transaccionExistente, error: errorBuscandoTransaccion } =
