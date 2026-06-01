@@ -8,7 +8,6 @@ const baseUrl =
 const buyerAppUrl = (
   process.env.BUYER_APP_URL || "https://proyecto-c-buyer2-lama.vercel.app"
 ).replace(/\/$/, "");
-const mercadoPagoAccessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN || "";
 
 function obtenerCheckoutUrl({
   initPoint,
@@ -25,10 +24,6 @@ function obtenerCheckoutUrl({
 
   if (checkoutMode === "production") {
     return initPoint || sandboxInitPoint;
-  }
-
-  if (mercadoPagoAccessToken.startsWith("TEST-")) {
-    return sandboxInitPoint || initPoint;
   }
 
   return initPoint || sandboxInitPoint;
@@ -174,7 +169,12 @@ export async function POST(req: NextRequest) {
       "Notification URL enviada a Mercado Pago:",
       `${baseUrl}/api/mercadopago/webhook`
     );
-    console.log("Orden enviada a Mercado Pago:", orden_id);
+    console.log("Orden enviada a Mercado Pago:", {
+      orden_id,
+      monto_total,
+      monto_producto,
+      monto_envio,
+    });
 
     const preference = await preferenceClient.create({
       body: {
@@ -187,10 +187,6 @@ export async function POST(req: NextRequest) {
             currency_id: "ARS",
           },
         ],
-
-        payer: {
-          email: comprador_email,
-        },
 
         external_reference: orden_id,
 
@@ -217,6 +213,12 @@ export async function POST(req: NextRequest) {
     const checkoutUrl = obtenerCheckoutUrl({
       initPoint: preference.init_point,
       sandboxInitPoint: preference.sandbox_init_point,
+    });
+
+    console.log("Checkout URL seleccionada:", {
+      modo: process.env.MERCADO_PAGO_CHECKOUT_MODE || "init_point_por_defecto",
+      usa_sandbox: checkoutUrl === preference.sandbox_init_point,
+      usa_produccion: checkoutUrl === preference.init_point,
     });
 
     return NextResponse.json(
