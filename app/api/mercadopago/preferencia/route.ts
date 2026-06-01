@@ -214,13 +214,6 @@ export async function POST(req: NextRequest) {
       sandbox_init_point: preference.sandbox_init_point,
     });
 
-<<<<<<< HEAD
-    const usaCredencialesSandbox =
-      process.env.MERCADO_PAGO_ACCESS_TOKEN?.startsWith("TEST-");
-    const checkoutUrl = usaCredencialesSandbox
-      ? preference.sandbox_init_point || preference.init_point
-      : preference.init_point || preference.sandbox_init_point;
-=======
     const checkoutUrl = obtenerCheckoutUrl({
       initPoint: preference.init_point,
       sandboxInitPoint: preference.sandbox_init_point,
@@ -231,12 +224,10 @@ export async function POST(req: NextRequest) {
       usa_sandbox: checkoutUrl === preference.sandbox_init_point,
       usa_produccion: checkoutUrl === preference.init_point,
     });
->>>>>>> 881a558e28c31a3872c3288f6ed9b79e5f714db2
 
     return NextResponse.json(
       {
         preference_id: preference.id,
-        checkout_url: checkoutUrl,
         init_point: preference.init_point,
         sandbox_init_point: preference.sandbox_init_point,
         checkout_url: checkoutUrl,
