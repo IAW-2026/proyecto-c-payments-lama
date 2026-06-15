@@ -26,10 +26,9 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
 
-  const rol = searchParams.get("rol");
+  const rol = searchParams.get("rol") ?? "super_admin";
 
   if (
-    !rol ||
     !["comprador", "vendedor", "super_admin"].includes(rol)
   ) {
     return NextResponse.json(
