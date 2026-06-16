@@ -6,6 +6,7 @@ type ServicioApi =
   | "buyer"
   | "seller"
   | "shipping"
+  | "analytics"
   | "mercadopago";
 
 const variablesPorServicio: Record<ServicioApi, string[]> = {
@@ -17,6 +18,7 @@ const variablesPorServicio: Record<ServicioApi, string[]> = {
     "PAYMENTS_SHIPPING_API_KEY",
     "SHIPPING_APP_API_KEY",
   ],
+  analytics: ["ANALYTICS_API_KEY"],
   mercadopago: ["PAYMENTS_MERCADO_PAGO_WEBHOOK_KEY"],
 };
 

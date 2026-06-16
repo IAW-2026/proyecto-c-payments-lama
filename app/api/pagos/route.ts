@@ -16,23 +16,25 @@ function obtenerTexto(value: unknown) {
 }
 
 export async function GET(req: NextRequest) {
-  const apiKeyAdmin = validarApiKeyServicio(req, ["admin"], {
+  const apiKeyServicio = validarApiKeyServicio(req, ["admin", "analytics"], {
     requerida: false,
   });
 
-  if (apiKeyAdmin.response) {
-    return apiKeyAdmin.response;
+  if (apiKeyServicio.response) {
+    return apiKeyServicio.response;
   }
 
-  const esServicioAdmin = apiKeyAdmin.servicio === "admin";
+  const esServicioInterno =
+    apiKeyServicio.servicio === "admin" ||
+    apiKeyServicio.servicio === "analytics";
   let userId: string | null = null;
 
-  if (!esServicioAdmin) {
+  if (!esServicioInterno) {
     const authData = await auth();
     userId = authData.userId;
   }
 
-  if (!userId && !esServicioAdmin) {
+  if (!userId && !esServicioInterno) {
     return NextResponse.json(
       { error: "Debes iniciar sesion para consultar pagos" },
       { status: 401 }
@@ -72,7 +74,7 @@ export async function GET(req: NextRequest) {
     query = query.eq("vendedor_id", userId);
   }
 
-  if (rol === "super_admin" && !esServicioAdmin) {
+  if (rol === "super_admin" && !esServicioInterno) {
     const user = await currentUser();
     const roles = [
       ...toRoleList(user?.publicMetadata.roles),
