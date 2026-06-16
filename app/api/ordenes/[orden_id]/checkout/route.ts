@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { obtenerApiKeyServicio } from "@/lib/api-keys";
 
 type OrdenCheckoutBuyer = {
   orden_id?: unknown;
@@ -97,12 +98,13 @@ export async function GET(
   ).replace(/\/$/, "");
 
   const { orden_id } = await context.params;
+  const buyerApiKey = obtenerApiKeyServicio("buyer");
   const headers: HeadersInit = {
     Accept: "application/json",
   };
 
-  if (process.env.BUYER_APP_API_KEY) {
-    headers.Authorization = `Bearer ${process.env.BUYER_APP_API_KEY}`;
+  if (buyerApiKey) {
+    headers.Authorization = `Bearer ${buyerApiKey}`;
   }
 
   const buyerRes = await fetch(

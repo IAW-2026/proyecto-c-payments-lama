@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { validarApiKeyServicio } from "@/lib/api-keys";
 import { supabase } from "@/lib/supabase";
 
 function toRoleList(value: unknown) {
@@ -15,9 +16,23 @@ function obtenerTexto(value: unknown) {
 }
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth();
+  const apiKeyAdmin = validarApiKeyServicio(req, ["admin"], {
+    requerida: false,
+  });
 
-  if (!userId) {
+  if (apiKeyAdmin.response) {
+    return apiKeyAdmin.response;
+  }
+
+  const esServicioAdmin = apiKeyAdmin.servicio === "admin";
+  let userId: string | null = null;
+
+  if (!esServicioAdmin) {
+    const authData = await auth();
+    userId = authData.userId;
+  }
+
+  if (!userId && !esServicioAdmin) {
     return NextResponse.json(
       { error: "Debes iniciar sesion para consultar pagos" },
       { status: 401 }
@@ -42,6 +57,13 @@ export async function GET(req: NextRequest) {
     .select("*")
     .order("fecha_creacion", { ascending: false });
 
+  if ((rol === "comprador" || rol === "vendedor") && !userId) {
+    return NextResponse.json(
+      { error: "Los filtros comprador y vendedor requieren sesion de usuario" },
+      { status: 400 }
+    );
+  }
+
   if (rol === "comprador") {
     query = query.eq("comprador_id", userId);
   }
@@ -50,7 +72,7 @@ export async function GET(req: NextRequest) {
     query = query.eq("vendedor_id", userId);
   }
 
-  if (rol === "super_admin") {
+  if (rol === "super_admin" && !esServicioAdmin) {
     const user = await currentUser();
     const roles = [
       ...toRoleList(user?.publicMetadata.roles),

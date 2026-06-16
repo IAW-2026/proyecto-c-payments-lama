@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  obtenerApiKeyServicio,
+  validarApiKeyServicio,
+} from "@/lib/api-keys";
 import { supabase } from "@/lib/supabase";
 
 const SELLER_APP_URL =
   (
     process.env.SELLER_APP_URL || "https://proyecto-c-seller-lama.vercel.app"
   ).replace(/\/$/, "");
-const SELLER_APP_API_KEY = process.env.SELLER_APP_API_KEY;
+const SELLER_APP_API_KEY = obtenerApiKeyServicio("seller");
 const SHIPPING_APP_URL = (
   process.env.SHIPPING_APP_URL || "https://proyecto-c-shipping-lama.vercel.app"
 ).replace(/\/$/, "");
-const SHIPPING_APP_API_KEY = process.env.SHIPPING_APP_API_KEY;
+const SHIPPING_APP_API_KEY = obtenerApiKeyServicio("shipping");
 
 async function patchJson({
   url,
@@ -18,7 +22,7 @@ async function patchJson({
   appName,
 }: {
   url: string;
-  apiKey?: string;
+  apiKey?: string | null;
   body: Record<string, unknown>;
   appName: string;
 }) {
@@ -117,6 +121,12 @@ function obtenerMensajeError(error: unknown) {
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = validarApiKeyServicio(req, ["shipping"]);
+
+    if (apiKey.response) {
+      return apiKey.response;
+    }
+
     const { orden_id, envio_id } = await req.json();
 
     if (!orden_id || !envio_id) {

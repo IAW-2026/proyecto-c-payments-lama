@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { obtenerMercadoPagoWebhookApiKey } from "@/lib/api-keys";
 import { preferenceClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
 
@@ -31,6 +32,17 @@ function obtenerCheckoutUrl({
 
 function obtenerTexto(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function obtenerWebhookUrlMercadoPago() {
+  const url = new URL(`${baseUrl}/api/mercadopago/webhook`);
+  const apiKey = obtenerMercadoPagoWebhookApiKey();
+
+  if (apiKey) {
+    url.searchParams.set("api_key", apiKey);
+  }
+
+  return url.toString();
 }
 
 export async function POST(req: NextRequest) {
@@ -165,10 +177,12 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("Base URL usada:", baseUrl);
-    console.log(
-      "Notification URL enviada a Mercado Pago:",
-      `${baseUrl}/api/mercadopago/webhook`
-    );
+    const notificationUrl = obtenerWebhookUrlMercadoPago();
+
+    console.log("Notification URL enviada a Mercado Pago:", {
+      url: `${baseUrl}/api/mercadopago/webhook`,
+      protegida_con_api_key: Boolean(obtenerMercadoPagoWebhookApiKey()),
+    });
     console.log("Orden enviada a Mercado Pago:", {
       orden_id,
       monto_total,
@@ -204,7 +218,7 @@ export async function POST(req: NextRequest) {
           pending: buyerAppUrl,
         },
 
-        notification_url: `${baseUrl}/api/mercadopago/webhook`,
+        notification_url: notificationUrl,
       },
     });
 

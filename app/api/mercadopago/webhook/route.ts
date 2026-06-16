@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  obtenerMercadoPagoWebhookApiKey,
+  obtenerApiKeyServicio,
+  validarApiKeyServicio,
+} from "@/lib/api-keys";
 import { merchantOrderClient, paymentClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
 
@@ -17,7 +22,7 @@ const SELLER_APP_URL =
   (
     process.env.SELLER_APP_URL || "https://proyecto-c-seller-lama.vercel.app"
   ).replace(/\/$/, "");
-const SELLER_APP_API_KEY = process.env.SELLER_APP_API_KEY;
+const SELLER_APP_API_KEY = obtenerApiKeyServicio("seller");
 const FORZAR_APROBADO_MERCADO_PAGO = true;
 
 function mapearEstadoMercadoPago(status: string) {
@@ -288,6 +293,14 @@ async function notificarSellerApp({
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = validarApiKeyServicio(req, ["mercadopago"], {
+      requerida: Boolean(obtenerMercadoPagoWebhookApiKey()),
+    });
+
+    if (apiKey.response) {
+      return apiKey.response;
+    }
+
     const body = (await req.json()) as WebhookMercadoPago;
 
     console.log("Webhook Mercado Pago recibido:", body);
