@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { obtenerApiKeyServicio } from "@/lib/api-keys";
+import { obtenerPaymentsApiKey } from "@/lib/api-keys";
 
 type OrdenCheckoutBuyer = {
   orden_id?: unknown;
@@ -98,14 +98,19 @@ export async function GET(
   ).replace(/\/$/, "");
 
   const { orden_id } = await context.params;
-  const buyerApiKey = obtenerApiKeyServicio("buyer");
+  const paymentsApiKey = obtenerPaymentsApiKey();
+
+  if (!paymentsApiKey) {
+    return NextResponse.json(
+      { error: "Falta configurar PAYMENTS_API_KEY" },
+      { status: 500 }
+    );
+  }
+
   const headers: HeadersInit = {
     Accept: "application/json",
+    Authorization: `Bearer ${paymentsApiKey}`,
   };
-
-  if (buyerApiKey) {
-    headers.Authorization = `Bearer ${buyerApiKey}`;
-  }
 
   const buyerRes = await fetch(
     `${buyerAppUrl}/api/ordenes/${encodeURIComponent(orden_id)}/checkout`,

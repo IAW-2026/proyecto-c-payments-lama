@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 type ServicioApi =
   | "admin"
-  | "buyer"
   | "seller"
   | "shipping"
   | "analytics"
@@ -11,7 +10,6 @@ type ServicioApi =
 
 const variablesPorServicio: Record<ServicioApi, string[]> = {
   admin: ["PAYMENTS_API_KEY", "CONTROL_PLANE_API_KEY", "PAYMENTS_ADMIN_API_KEY"],
-  buyer: ["BUYER_API_KEY", "PAYMENTS_BUYER_API_KEY"],
   seller: ["SELLER_API_KEY", "PAYMENTS_SELLER_API_KEY", "SELLER_APP_API_KEY"],
   shipping: [
     "SHIPPING_API_KEY",
@@ -32,6 +30,10 @@ export function obtenerApiKeyServicio(servicio: ServicioApi) {
   }
 
   return null;
+}
+
+export function obtenerPaymentsApiKey() {
+  return process.env.PAYMENTS_API_KEY?.trim() || null;
 }
 
 function compararApiKeys(apiKeyRecibida: string, apiKeyEsperada: string) {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import {
-  obtenerApiKeyServicio,
   obtenerMercadoPagoWebhookApiKey,
+  obtenerPaymentsApiKey,
 } from "@/lib/api-keys";
 import { preferenceClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
@@ -117,10 +117,10 @@ function normalizarOrden(data: OrdenCheckoutBuyer, ordenId: string) {
 }
 
 async function obtenerOrdenVerificada(ordenId: string) {
-  const buyerApiKey = obtenerApiKeyServicio("buyer");
+  const paymentsApiKey = obtenerPaymentsApiKey();
 
-  if (!buyerApiKey) {
-    throw new Error("Falta configurar la API key de Buyer App");
+  if (!paymentsApiKey) {
+    throw new Error("Falta configurar PAYMENTS_API_KEY");
   }
 
   const buyerRes = await fetch(
@@ -128,7 +128,7 @@ async function obtenerOrdenVerificada(ordenId: string) {
     {
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${buyerApiKey}`,
+        Authorization: `Bearer ${paymentsApiKey}`,
       },
       cache: "no-store",
     }
