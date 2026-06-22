@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { obtenerMercadoPagoWebhookApiKey } from "@/lib/api-keys";
+import {
+  obtenerApiKeyServicio,
+  obtenerMercadoPagoWebhookApiKey,
+} from "@/lib/api-keys";
 import { preferenceClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
 
@@ -9,6 +12,24 @@ const baseUrl =
 const buyerAppUrl = (
   process.env.BUYER_APP_URL || "https://proyecto-c-buyer2-lama.vercel.app"
 ).replace(/\/$/, "");
+
+type OrdenCheckoutBuyer = {
+  orden_id?: unknown;
+  comprador?: {
+    comprador_id?: unknown;
+    nombre?: unknown;
+    email?: unknown;
+  };
+  vendedor_id?: unknown;
+  producto?: {
+    titulo?: unknown;
+    precio?: unknown;
+  };
+  titulo?: unknown;
+  monto_producto?: unknown;
+  monto_envio?: unknown;
+  monto_total?: unknown;
+};
 
 function obtenerCheckoutUrl({
   initPoint,
@@ -34,6 +55,111 @@ function obtenerTexto(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function obtenerNumero(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function importesIguales(a: number, b: number) {
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+function normalizarOrden(data: OrdenCheckoutBuyer, ordenId: string) {
+  const ordenIdRecibida = obtenerTexto(data.orden_id);
+  const compradorId = obtenerTexto(data.comprador?.comprador_id);
+  const compradorNombre = obtenerTexto(data.comprador?.nombre);
+  const compradorEmail = obtenerTexto(data.comprador?.email);
+  const vendedorId = obtenerTexto(data.vendedor_id);
+  const titulo =
+    obtenerTexto(data.producto?.titulo) ||
+    obtenerTexto(data.titulo) ||
+    "Producto de la orden";
+  const montoProducto =
+    obtenerNumero(data.producto?.precio) ?? obtenerNumero(data.monto_producto);
+  const montoEnvio = obtenerNumero(data.monto_envio) ?? 0;
+  const montoTotalInformado = obtenerNumero(data.monto_total);
+
+  if (ordenIdRecibida && ordenIdRecibida !== ordenId) {
+    return null;
+  }
+
+  if (
+    !compradorId ||
+    !compradorNombre ||
+    !compradorEmail ||
+    !vendedorId ||
+    montoProducto === null ||
+    montoProducto <= 0 ||
+    montoEnvio < 0
+  ) {
+    return null;
+  }
+
+  const montoTotal = montoProducto + montoEnvio;
+
+  if (
+    montoTotalInformado !== null &&
+    !importesIguales(montoTotalInformado, montoTotal)
+  ) {
+    return null;
+  }
+
+  return {
+    ordenId,
+    titulo,
+    compradorId,
+    compradorNombre,
+    compradorEmail,
+    vendedorId,
+    montoProducto,
+    montoEnvio,
+    montoTotal,
+  };
+}
+
+async function obtenerOrdenVerificada(ordenId: string) {
+  const buyerApiKey = obtenerApiKeyServicio("buyer");
+
+  if (!buyerApiKey) {
+    throw new Error("Falta configurar la API key de Buyer App");
+  }
+
+  const buyerRes = await fetch(
+    `${buyerAppUrl}/api/ordenes/${encodeURIComponent(ordenId)}/checkout`,
+    {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${buyerApiKey}`,
+      },
+      cache: "no-store",
+    }
+  );
+  const data = (await buyerRes.json().catch(() => null)) as
+    | OrdenCheckoutBuyer
+    | null;
+
+  if (!buyerRes.ok) {
+    return {
+      orden: null,
+      error:
+        (data && "error" in data && obtenerTexto(data.error)) ||
+        "Buyer App no pudo verificar la orden",
+      status: buyerRes.status === 404 ? 404 : 502,
+    };
+  }
+
+  const orden = data ? normalizarOrden(data, ordenId) : null;
+
+  if (!orden) {
+    return {
+      orden: null,
+      error: "Buyer App devolvio una orden incompleta o inconsistente",
+      status: 502,
+    };
+  }
+
+  return { orden, error: null, status: 200 };
+}
+
 function obtenerWebhookUrlMercadoPago() {
   const url = new URL(`${baseUrl}/api/mercadopago/webhook`);
   const apiKey = obtenerMercadoPagoWebhookApiKey();
@@ -57,81 +183,39 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const comprador = body.comprador;
+    const ordenId = obtenerTexto(body?.orden_id);
 
-    const comprador_id = obtenerTexto(
-      comprador?.comprador_id ?? body.comprador_id
-    );
-    const comprador_nombre = obtenerTexto(
-      comprador?.nombre ?? body.comprador_nombre
-    );
-    const comprador_email = obtenerTexto(
-      comprador?.email ?? body.comprador_email
-    );
-    const vendedor_id = obtenerTexto(body.vendedor_id);
-
-    const {
-      orden_id,
-      titulo,
-      monto_producto,
-      monto_envio = 0,
-      monto_total,
-    } = body;
-
-    if (
-      !orden_id ||
-      !titulo ||
-      !comprador_id ||
-      !comprador_nombre ||
-      !comprador_email ||
-      !vendedor_id
-    ) {
+    if (!ordenId) {
       return NextResponse.json(
-        {
-          error:
-            "Faltan datos obligatorios para crear el pago y la preferencia",
-        },
+        { error: "Falta el identificador de la orden" },
         { status: 400 }
       );
     }
 
-    if (comprador_id !== userId) {
+    const resultadoOrden = await obtenerOrdenVerificada(ordenId);
+
+    if (!resultadoOrden.orden) {
       return NextResponse.json(
-        { error: "No podes crear una preferencia para otro comprador" },
+        { error: resultadoOrden.error },
+        { status: resultadoOrden.status }
+      );
+    }
+
+    const orden = resultadoOrden.orden;
+
+    if (orden.compradorId !== userId) {
+      return NextResponse.json(
+        { error: "Esta orden pertenece a otro comprador" },
         { status: 403 }
-      );
-    }
-
-    if (typeof monto_producto !== "number" || monto_producto <= 0) {
-      return NextResponse.json(
-        { error: "monto_producto debe ser un numero positivo" },
-        { status: 400 }
-      );
-    }
-
-    if (typeof monto_envio !== "number" || monto_envio < 0) {
-      return NextResponse.json(
-        { error: "monto_envio debe ser un numero mayor o igual a 0" },
-        { status: 400 }
-      );
-    }
-
-    const montoTotalCalculado = monto_producto + monto_envio;
-
-    if (
-      typeof monto_total !== "number" ||
-      monto_total !== montoTotalCalculado
-    ) {
-      return NextResponse.json(
-        { error: "monto_total debe coincidir con producto + envio" },
-        { status: 400 }
       );
     }
 
     const pagoExistente = await supabase
       .from("pago")
-      .select("pago_id")
-      .eq("orden_id", orden_id)
+      .select(
+        "pago_id, comprador_id, vendedor_id, monto_producto, monto_envio, monto_total, moneda, estado"
+      )
+      .eq("orden_id", ordenId)
       .maybeSingle();
 
     if (pagoExistente.error) {
@@ -141,25 +225,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!pagoExistente.data) {
+    if (pagoExistente.data) {
+      const pago = pagoExistente.data;
+      const coincideConOrden =
+        pago.comprador_id === orden.compradorId &&
+        pago.vendedor_id === orden.vendedorId &&
+        pago.moneda === "ARS" &&
+        importesIguales(pago.monto_producto, orden.montoProducto) &&
+        importesIguales(pago.monto_envio, orden.montoEnvio) &&
+        importesIguales(pago.monto_total, orden.montoTotal);
+
+      if (!coincideConOrden) {
+        return NextResponse.json(
+          {
+            error:
+              "El pago registrado no coincide con los datos oficiales de la orden",
+          },
+          { status: 409 }
+        );
+      }
+
+      if (["aprobado", "cancelado"].includes(pago.estado)) {
+        return NextResponse.json(
+          { error: `No se puede iniciar el pago porque ya esta ${pago.estado}` },
+          { status: 409 }
+        );
+      }
+    } else {
       const porcentajeComision = 0.1;
-      const comision = monto_producto * porcentajeComision;
-      const monto_neto = monto_producto - comision;
+      const comision = orden.montoProducto * porcentajeComision;
+      const montoNeto = orden.montoProducto - comision;
 
       const { error: errorPago } = await supabase
         .from("pago")
         .insert([
           {
-            orden_id,
-            comprador_id,
-            comprador_nombre,
-            comprador_email,
-            vendedor_id,
-            monto_producto,
-            monto_envio,
+            orden_id: orden.ordenId,
+            comprador_id: orden.compradorId,
+            comprador_nombre: orden.compradorNombre,
+            comprador_email: orden.compradorEmail,
+            vendedor_id: orden.vendedorId,
+            monto_producto: orden.montoProducto,
+            monto_envio: orden.montoEnvio,
             comision,
-            monto_neto,
-            monto_total: montoTotalCalculado,
+            monto_neto: montoNeto,
+            monto_total: orden.montoTotal,
             moneda: "ARS",
             estado: "pendiente",
             proveedor: "MERCADO_PAGO",
@@ -184,32 +294,32 @@ export async function POST(req: NextRequest) {
       protegida_con_api_key: Boolean(obtenerMercadoPagoWebhookApiKey()),
     });
     console.log("Orden enviada a Mercado Pago:", {
-      orden_id,
-      monto_total,
-      monto_producto,
-      monto_envio,
+      orden_id: orden.ordenId,
+      monto_total: orden.montoTotal,
+      monto_producto: orden.montoProducto,
+      monto_envio: orden.montoEnvio,
     });
 
     const preference = await preferenceClient.create({
       body: {
         items: [
           {
-            id: orden_id,
-            title: titulo,
+            id: orden.ordenId,
+            title: orden.titulo,
             quantity: 1,
-            unit_price: monto_total,
+            unit_price: orden.montoTotal,
             currency_id: "ARS",
           },
         ],
 
         payer: {
-          email: comprador_email,
+          email: orden.compradorEmail,
         },
 
-        external_reference: orden_id,
+        external_reference: orden.ordenId,
 
         metadata: {
-          orden_id,
+          orden_id: orden.ordenId,
         },
 
         back_urls: {

@@ -252,10 +252,6 @@ export default function PagoPage() {
       setCargando(true);
       setMensajeError(null);
 
-      const compradorEmail =
-        user.primaryEmailAddress?.emailAddress ||
-        orden.comprador.email;
-
       const mpRes = await fetch("/api/mercadopago/preferencia", {
         method: "POST",
         headers: {
@@ -263,17 +259,6 @@ export default function PagoPage() {
         },
         body: JSON.stringify({
           orden_id: orden.orden_id,
-          titulo: orden.producto_titulo,
-          comprador: {
-            comprador_id: orden.comprador.comprador_id,
-            nombre: orden.comprador.nombre,
-            email: compradorEmail,
-          },
-          vendedor_id: orden.vendedor_id,
-          monto_producto: orden.monto_producto,
-          monto_envio: orden.monto_envio,
-          monto_total: total,
-          comprador_email: compradorEmail,
         }),
       });
 

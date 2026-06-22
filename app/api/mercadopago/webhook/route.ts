@@ -23,7 +23,6 @@ const SELLER_APP_URL =
     process.env.SELLER_APP_URL || "https://proyecto-c-seller-lama.vercel.app"
   ).replace(/\/$/, "");
 const SELLER_APP_API_KEY = obtenerApiKeyServicio("seller");
-const FORZAR_APROBADO_MERCADO_PAGO = true;
 
 function mapearEstadoMercadoPago(status: string) {
   if (status === "approved") return "aprobado";
@@ -43,10 +42,6 @@ function obtenerTipoTransaccion(status: string) {
   if (status === "rejected") return "rechazo";
   if (status === "cancelled") return "cancelacion";
   return "autorizacion";
-}
-
-function aplicarForzadoSiCorresponde(status: string) {
-  return FORZAR_APROBADO_MERCADO_PAGO ? "approved" : status;
 }
 
 function extraerIdRecurso(body: WebhookMercadoPago) {
@@ -146,101 +141,6 @@ async function obtenerPaymentIdDesdeWebhook(body: WebhookMercadoPago) {
   return pagoPreferido?.id ? String(pagoPreferido.id) : null;
 }
 
-async function aprobarPagoForzadoDesdeWebhook(body: WebhookMercadoPago) {
-  const recursoId = extraerIdRecurso(body);
-  const tipoNotificacion = obtenerTipoNotificacion(body);
-
-  if (!recursoId || tipoNotificacion !== "merchant_order") {
-    return null;
-  }
-
-  const merchantOrder = await merchantOrderClient.get({
-    merchantOrderId: String(recursoId),
-  });
-  const ordenId = merchantOrder.external_reference;
-
-  if (!ordenId) {
-    return null;
-  }
-
-  const pagoProveedorId = `FORZADO-${recursoId}`;
-  const fechaActualizacion = new Date().toISOString();
-
-  const { data: pagoActualizado, error: errorPago } = await supabase
-    .from("pago")
-    .update({
-      estado: "aprobado",
-      pago_proveedor_id: pagoProveedorId,
-      fecha_actualizacion: fechaActualizacion,
-      fecha_aprobado: fechaActualizacion,
-    })
-    .eq("orden_id", ordenId)
-    .select()
-    .maybeSingle();
-
-  if (errorPago) {
-    throw new Error(errorPago.message);
-  }
-
-  if (!pagoActualizado) {
-    return null;
-  }
-
-  try {
-    await notificarSellerApp({
-      ordenId,
-      estadoPago: "aprobado",
-      pagoId: pagoActualizado.pago_id,
-      motivo: "Pago aprobado forzado para prueba de integracion",
-    });
-  } catch (error) {
-    console.error(
-      "Modo forzado activo: no se pudo notificar Seller, pero Payments queda aprobado",
-      error
-    );
-  }
-
-  const { data: transaccionExistente, error: errorBuscandoTransaccion } =
-    await supabase
-      .from("transaccion_de_pago")
-      .select("transaccion_id")
-      .eq("pago_id", pagoActualizado.pago_id)
-      .eq("tipo_transaccion", "captura")
-      .eq("transaccion_proveedor_id", pagoProveedorId)
-      .maybeSingle();
-
-  if (errorBuscandoTransaccion) {
-    throw new Error(errorBuscandoTransaccion.message);
-  }
-
-  if (!transaccionExistente) {
-    const { error: errorTransaccion } = await supabase
-      .from("transaccion_de_pago")
-      .insert([
-        {
-          pago_id: pagoActualizado.pago_id,
-          tipo_transaccion: "captura",
-          monto: pagoActualizado.monto_total || 0,
-          estado: "aprobado",
-          transaccion_proveedor_id: pagoProveedorId,
-          codigo_proveedor: "APROBADO_FORZADO",
-          mensaje_proveedor:
-            "Pago aprobado forzado para probar el flujo completo",
-        },
-      ]);
-
-    if (errorTransaccion) {
-      throw new Error(errorTransaccion.message);
-    }
-  }
-
-  return {
-    ordenId,
-    pagoId: pagoActualizado.pago_id,
-    pagoProveedorId,
-  };
-}
-
 async function notificarSellerApp({
   ordenId,
   estadoPago,
@@ -304,32 +204,11 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as WebhookMercadoPago;
 
     console.log("Webhook Mercado Pago recibido:", body);
-    console.log("Modo forzar aprobado Mercado Pago:", {
-      activo: FORZAR_APROBADO_MERCADO_PAGO,
-      origen: "forzado_en_codigo_para_pruebas",
-    });
 
     const mercadoPagoPaymentId = await obtenerPaymentIdDesdeWebhook(body);
 
     if (!mercadoPagoPaymentId) {
-      if (FORZAR_APROBADO_MERCADO_PAGO) {
-        const pagoForzado = await aprobarPagoForzadoDesdeWebhook(body);
-
-        if (pagoForzado) {
-          console.log("Pago aprobado forzado para pruebas:", pagoForzado);
-
-          return NextResponse.json(
-            {
-              message: "Pago aprobado forzado para pruebas",
-              orden_id: pagoForzado.ordenId,
-              pago_id: pagoForzado.pagoId,
-            },
-            { status: 200 }
-          );
-        }
-      }
-
-      console.log("Webhook de prueba recibido sin payment id:", body);
+      console.log("Webhook recibido sin payment id:", body);
 
       return NextResponse.json(
         {
@@ -371,9 +250,7 @@ export async function POST(req: NextRequest) {
     });
 
     const ordenId = pagoMercadoPago.external_reference;
-    const estadoMercadoPago = aplicarForzadoSiCorresponde(
-      pagoMercadoPago.status || "pending"
-    );
+    const estadoMercadoPago = pagoMercadoPago.status || "pending";
     const estadoPago = mapearEstadoMercadoPago(estadoMercadoPago);
     const tipoTransaccion = obtenerTipoTransaccion(estadoMercadoPago);
     const monto = pagoMercadoPago.transaction_amount || 0;
@@ -449,16 +326,10 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error("Error notificando Seller App:", error);
 
-      if (FORZAR_APROBADO_MERCADO_PAGO) {
-        console.log(
-          "Modo forzado activo: el pago queda aprobado aunque falle Seller App"
-        );
-      } else {
-        return NextResponse.json(
-          { error: "No se pudo notificar el pago a Seller App" },
-          { status: 502 }
-        );
-      }
+      return NextResponse.json(
+        { error: "No se pudo notificar el pago a Seller App" },
+        { status: 502 }
+      );
     }
 
     const { data: transaccionExistente, error: errorBuscandoTransaccion } =

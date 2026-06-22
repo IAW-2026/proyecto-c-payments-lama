@@ -22,7 +22,7 @@ Además, la plata en cuenta es aproximadamente $800, así que dejamos los produc
 5. Payments valida que el usuario logueado sea el comprador de esa orden.
 6. Al tocar **Pagar con Mercado Pago**, Payments crea la preferencia de pago y registra el pago interno.
 7. Mercado Pago llama al webhook de Payments.
-8. En el modo actual de demo, Payments marca el pago como `aprobado` aunque Mercado Pago no devuelva un pago real.
+8. Payments consulta el pago en Mercado Pago y refleja exclusivamente el estado informado por el proveedor.
 9. Desde el panel comprador se pueden ver compras, estados, reintentar pagos pendientes/rechazados y descargar comprobantes aprobados.
 10. Desde el panel vendedor se pueden ver ventas, estados de pago, comisiones, neto a cobrar y estado de liquidación.
 11. Desde el panel superadmin se pueden revisar movimientos generales, pagos por estado, compradores, vendedores, comisiones y pagos demorados.
@@ -71,10 +71,8 @@ El sistema contempla tres vistas principales: comprador, vendedor y superadmin. 
 - La autenticación se maneja con Clerk.
 - La base de datos se maneja con Supabase.
 - Mercado Pago se usa para crear preferencias y recibir webhooks.
-- Actualmente se dejó un comportamiento especial de demo: el webhook de Mercado Pago aprueba siempre el pago para poder mostrar el flujo completo porque se había caído Mercado Pago.
-- Esta decisión se tomó porque durante las pruebas Mercado Pago abría la orden, pero devolvía `merchant_order` con `payments: []`, dejando el pago sin `payment_id`.
-- Con este modo forzado se puede validar el resto del sistema: actualización del pago, panel comprador, comprobante, notificación a Seller, entrega desde Shipping y liquidación.
+- El webhook refleja exclusivamente los estados reales informados por Mercado Pago.
+- Si una notificación `merchant_order` llega con `payments: []`, Payments no modifica el estado interno hasta poder resolver un `payment_id` real.
 - También se dejaron datos de prueba con un pago pendiente y un pago rechazado para mostrar que el comprador puede pagar o reintentar el pago desde su panel dentro de Payments.
-- Para volver al comportamiento real, hay que quitar el forzado del webhook y volver a mapear exclusivamente los estados reales de Mercado Pago.
 - La liquidación no cambia el estado principal del pago; el pago queda `aprobado` y la liquidación se registra mediante transacciones internas.
 - Para evitar errores con el constraint de la tabla `transaccion_de_pago`, las liquidaciones se registran como `tipo_transaccion = "captura"` y se distinguen por `transaccion_proveedor_id`.
