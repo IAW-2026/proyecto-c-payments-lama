@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   obtenerMercadoPagoWebhookApiKey,
-  obtenerApiKeyServicio,
+  obtenerPaymentsApiKey,
   validarApiKeyServicio,
 } from "@/lib/api-keys";
 import { merchantOrderClient, paymentClient } from "@/lib/mercadopago";
@@ -22,7 +22,7 @@ const SELLER_APP_URL =
   (
     process.env.SELLER_APP_URL || "https://proyecto-c-seller-lama.vercel.app"
   ).replace(/\/$/, "");
-const SELLER_APP_API_KEY = obtenerApiKeyServicio("seller");
+const PAYMENTS_API_KEY = obtenerPaymentsApiKey();
 
 function mapearEstadoMercadoPago(status: string) {
   if (status === "approved") return "aprobado";
@@ -160,8 +160,10 @@ async function notificarSellerApp({
     "Content-Type": "application/json",
   };
 
-  if (SELLER_APP_API_KEY) {
-    headers.Authorization = `Bearer ${SELLER_APP_API_KEY}`;
+  if (PAYMENTS_API_KEY) {
+    headers.Authorization = `Bearer ${PAYMENTS_API_KEY}`;
+    headers["x-api-key"] = PAYMENTS_API_KEY;
+    headers["x-service-name"] = "payments";
   }
 
   const res = await fetch(url, {
