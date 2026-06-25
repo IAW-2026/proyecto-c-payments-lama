@@ -110,6 +110,7 @@ export async function GET(
   const headers: HeadersInit = {
     Accept: "application/json",
     Authorization: `Bearer ${paymentsApiKey}`,
+    "x-service-name": "payments",
   };
 
   const buyerRes = await fetch(
