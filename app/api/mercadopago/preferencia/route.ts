@@ -129,6 +129,7 @@ async function obtenerOrdenVerificada(ordenId: string) {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${paymentsApiKey}`,
+        "x-api-key": paymentsApiKey,
         "x-service-name": "payments",
       },
       cache: "no-store",
