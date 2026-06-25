@@ -4,6 +4,7 @@ import {
   obtenerPaymentsApiKey,
   validarApiKeyServicio,
 } from "@/lib/api-keys";
+import { enviarEmailCompraAprobada } from "@/lib/email";
 import { merchantOrderClient, paymentClient } from "@/lib/mercadopago";
 import { supabase } from "@/lib/supabase";
 
@@ -388,6 +389,20 @@ export async function POST(req: NextRequest) {
         { error: errorTransaccion.message },
         { status: 500 }
       );
+    }
+
+    if (estadoPago === "aprobado" && pagoActualizado.comprador_email) {
+      try {
+        await enviarEmailCompraAprobada({
+          email: pagoActualizado.comprador_email,
+          ordenId,
+          pagoId: pagoActualizado.pago_id,
+          montoTotal: pagoActualizado.monto_total,
+          moneda: pagoActualizado.moneda,
+        });
+      } catch (error) {
+        console.error("Error enviando email de compra aprobada:", error);
+      }
     }
 
     return NextResponse.json(
